@@ -36,7 +36,11 @@ if (!admin.apps.length) {
 }
 
 export const auth = admin.auth();
-export const database = admin.database();
+// Derive database URL from project ID to target the correct emulator namespace
+// (emulator loads .indexOn rules only for the {projectId}-default-rtdb namespace)
+const projectId = admin.app().options.projectId || "cooklynx-ai";
+const databaseURL = `https://${projectId}-default-rtdb.firebaseio.com`;
+export const database = admin.app().database(databaseURL);
 export const storage = admin.storage();
 
 // Initialize Gemini AI
