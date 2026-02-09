@@ -327,6 +327,56 @@ export class ImageController extends Controller {
   }
 
   /**
+   * Get image metadata and details.
+   * Returns full image information including storage path, dimensions, and analysis status.
+   * @summary Get image details
+   * @param imageId Unique image identifier
+   */
+  @Get("{imageId}")
+  @Response<ErrorResponse>(401, "Unauthorized")
+  @Response<ErrorResponse>(403, "Forbidden - not the owner")
+  @Response<ErrorResponse>(404, "Image not found")
+  @Response<ErrorResponse>(500, "Internal server error")
+  public async getImage(
+    @Request() request: ExpressRequest,
+    @Path() imageId: string
+  ): Promise<ImageMetadata> {
+    const user = request.user as AuthUser;
+
+    try {
+      // Get image metadata
+      const imageSnapshot = await database.ref(`images/${imageId}`).get();
+
+      if (!imageSnapshot.exists()) {
+        this.setStatus(404);
+        throw {error: "Not Found", message: "Image not found"};
+      }
+
+      const imageData = imageSnapshot.val() as ImageMetadata;
+
+      // Check ownership
+      if (imageData.userId !== user.uid) {
+        this.setStatus(403);
+        throw {
+          error: "Forbidden",
+          message: "You do not have access to this image",
+        };
+      }
+
+      return imageData;
+    } catch (error: unknown) {
+      if ((error as {error?: string}).error) {
+        throw error;
+      }
+      this.setStatus(500);
+      throw {
+        error: "Internal Server Error",
+        message: "Failed to get image details",
+      };
+    }
+  }
+
+  /**
    * Generate a fresh signed URL for an image.
    * Returns a fresh signed URL that expires in 7 days.
    * Call this endpoint to get a working download URL from the storagePath.

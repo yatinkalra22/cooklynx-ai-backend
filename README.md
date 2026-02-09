@@ -84,6 +84,7 @@ cooklynx-ai-backend/
 | `/v1/auth/google`               | POST   | Google sign-in               | No   |
 | `/v1/auth/me`                   | GET    | Get profile + credits        | Yes  |
 | `/v1/images/upload`             | POST   | Upload image for analysis    | Yes  |
+| `/v1/images/{id}`               | GET    | Get image metadata           | Yes  |
 | `/v1/images/{id}/analysis`      | GET    | Get analysis results (poll)  | Yes  |
 | `/v1/images/{id}/fixes`         | POST   | Create AI fix                | Yes  |
 | `/v1/images/{id}/fixes/{fixId}` | GET    | Get fix status/result (poll) | Yes  |
