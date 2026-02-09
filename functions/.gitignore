@@ -1,0 +1,12 @@
+# Compiled JavaScript files
+lib/
+
+# TypeScript v1 declaration files
+typings/
+
+# Node.js dependency directory
+node_modules/
+*.local
+
+# tsoa generated files (auto-generated on build)
+src/generated/
