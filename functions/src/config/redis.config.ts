@@ -40,8 +40,6 @@ export const CACHE_TTL = {
   IMAGE_METADATA: parseInt(process.env.CACHE_TTL_IMAGE_METADATA || "900", 10),
   IMAGE_LIST: parseInt(process.env.CACHE_TTL_IMAGE_LIST || "300", 10),
   ANALYSIS_RESULT: parseInt(process.env.CACHE_TTL_ANALYSIS || "86400", 10),
-  FIX_RESULT: parseInt(process.env.CACHE_TTL_FIX_RESULT || "604800", 10),
-  FIX_INDEX: parseInt(process.env.CACHE_TTL_FIX_INDEX || "7200", 10),
   IMAGE_HASH: parseInt(process.env.CACHE_TTL_IMAGE_HASH || "2592000", 10),
   API_RESPONSE_SHORT: parseInt(process.env.CACHE_TTL_API_SHORT || "300", 10),
   API_RESPONSE_MEDIUM: parseInt(process.env.CACHE_TTL_API_MEDIUM || "900", 10),
@@ -58,10 +56,6 @@ export const CACHE_KEYS = {
   imageHash: (userId: string, hash: string) => `ihash:${userId}:${hash}`,
   globalImageHash: (hash: string) => `ihash:global:${hash}`,
   analysis: (imageId: string) => `analysis:${imageId}`,
-  fixResult: (fixId: string) => `fix:${fixId}`,
-  fixBySignature: (imageId: string, signature: string) =>
-    `fixsig:${imageId}:${signature}`,
-  fixIndex: (imageId: string) => `fixidx:${imageId}`,
   apiResponse: (endpoint: string, params: string) =>
     `api:${endpoint}:${params}`,
   rateLimit: (userId: string, endpoint: string) => `rl:${userId}:${endpoint}`,
@@ -70,11 +64,6 @@ export const CACHE_KEYS = {
   videoList: (userId: string) => `user:${userId}:videos`,
   videoAnalysis: (videoId: string) => `videoanalysis:${videoId}`,
   videoProgress: (videoId: string) => `videoprogress:${videoId}`,
-  // Video fix cache keys
-  videoFixResult: (fixId: string) => `vfix:${fixId}`,
-  videoFixBySignature: (videoId: string, signature: string) =>
-    `vfixsig:${videoId}:${signature}`,
-  videoFixIndex: (videoId: string) => `vfixidx:${videoId}`,
   videoHash: (userId: string, hash: string) => `vhash:${userId}:${hash}`,
   // Asset cache keys
   assetList: (userId: string) => `user:${userId}:assets`,

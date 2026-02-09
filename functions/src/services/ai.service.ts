@@ -1,14 +1,9 @@
 import {
   geminiModel,
-  geminiImageModel,
   geminiModerationModel,
 } from "../config/firebase.config";
 import {StorageService} from "./storage.service";
-import {
-  Problem,
-  Solution,
-  FoodAnalysis,
-} from "../types/api.types";
+import {FoodAnalysis} from "../types/api.types";
 import * as logger from "firebase-functions/logger";
 
 /**
@@ -259,142 +254,6 @@ Be precise and helpful. Return ONLY valid JSON.
       analyzedAt: new Date().toISOString(),
       version: "1.0",
     };
-  }
-
-  /**
-   * Generate a fixed room image (DEPRECATED)
-   */
-  static async generateFixedImage(
-    userId: string,
-    imageId: string,
-    problemsToFix: Array<{
-      problem: Problem;
-      solution: Solution;
-      dimension: string;
-    }>,
-    sourceImageBuffer?: Buffer
-  ): Promise<{
-    imageBuffer: Buffer;
-    changesApplied: string[];
-    fixName?: string;
-    summary?: string;
-  }> {
-    const imageBuffer =
-      sourceImageBuffer ||
-      (await StorageService.downloadImage(userId, imageId));
-
-    if (sourceImageBuffer) {
-      logger.info("ai:processing-frame", {
-        bufferSize: imageBuffer.length,
-        isVideoFrame: !userId,
-      });
-    }
-
-    const base64Image = imageBuffer.toString("base64");
-    const prompt = this.buildFixPrompt(problemsToFix);
-
-    const requestGeminiFix = () =>
-      geminiImageModel.generateContent([
-        {
-          inlineData: {
-            data: base64Image,
-            mimeType: "image/jpeg",
-          },
-        },
-        {text: prompt},
-      ]);
-
-    const metadataPromise = this.generateFixMetadata(problemsToFix);
-
-    const result =
-      process.env.GEMINI_ENABLE_RETRY === "true"
-        ? await this.withGeminiRetry(requestGeminiFix)
-        : await requestGeminiFix();
-
-    const response = await result.response;
-    const generatedImageBuffer = this.extractGeneratedImage(response);
-    const changesApplied = this.extractChangesApplied(response, problemsToFix);
-
-    if (!generatedImageBuffer) {
-      throw new Error("Failed to generate fixed image");
-    }
-
-    const [, fixMetadata] = await Promise.all([
-      this.validateImageContent(generatedImageBuffer),
-      metadataPromise,
-    ]);
-
-    return {
-      imageBuffer: generatedImageBuffer,
-      changesApplied,
-      fixName: fixMetadata.fixName,
-      summary: fixMetadata.summary,
-    };
-  }
-
-  private static buildFixPrompt(
-    problemsToFix: Array<{
-      problem: Problem;
-      solution: Solution;
-      dimension: string;
-    }>
-  ): string {
-    return `Edit this room image to fix problems.`;
-  }
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private static extractGeneratedImage(response: any): Buffer | null {
-    try {
-      const candidates = response.candidates;
-      if (!candidates || candidates.length === 0) return null;
-      const parts = candidates[0].content?.parts;
-      if (!parts) return null;
-
-      for (const part of parts) {
-        if (part.inlineData?.data) {
-          return Buffer.from(part.inlineData.data, "base64");
-        }
-      }
-      return null;
-    } catch (error) {
-      return null;
-    }
-  }
-
-  private static extractChangesApplied(
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    response: any,
-    problemsToFix: Array<{
-      problem: Problem;
-      solution: Solution;
-      dimension: string;
-    }>
-  ): string[] {
-    return problemsToFix.map((p) => p.solution.title);
-  }
-
-  static async generateFixMetadata(
-    problemsToFix: Array<{
-      problem: Problem;
-      solution: Solution;
-      dimension: string;
-    }>
-  ): Promise<{fixName: string; summary: string}> {
-    return {fixName: "Fixed", summary: "Summary of changes"};
-  }
-
-  /**
-   * Generate a design plan (DEPRECATED)
-   */
-  static async generateFixPlan(
-    frameBuffer: Buffer,
-    problemsToFix: Array<{
-      problem: Problem;
-      solution: Solution;
-      dimension: string;
-    }>
-  ): Promise<string> {
-    return "Design plan description.";
   }
 
   /**

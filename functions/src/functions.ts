@@ -3,9 +3,8 @@ import {onMessagePublished} from "firebase-functions/v2/pubsub";
 import {defineSecret} from "firebase-functions/params";
 import {app} from "./index";
 import {VideoService} from "./services/video.service";
-import {VideoFixService} from "./services/video-fix.service";
 import {PUBSUB_TOPICS} from "./config/pubsub.config";
-import {VideoAnalysisMessage, VideoFixMessage} from "./types/video.types";
+import {VideoAnalysisMessage} from "./types/video.types";
 import * as logger from "firebase-functions/logger";
 
 // Define secrets (sensitive data only)
@@ -61,44 +60,6 @@ export const videoAnalysisWorker = onMessagePublished(
 
       // Do not re-throw to prevent infinite Pub/Sub retries
       // We want to stop processing if it fails
-    }
-  }
-);
-
-/**
- * Pub/Sub worker function for video fix processing
- * Processes video fix jobs from the video-fix-queue topic
- */
-export const videoFixWorker = onMessagePublished(
-  {
-    topic: PUBSUB_TOPICS.VIDEO_FIX_QUEUE,
-    region: REGION,
-    memory: "2GiB",
-    timeoutSeconds: 540, // 9 minutes for video fix processing
-    maxInstances: 5,
-  },
-  async (event) => {
-    const message = event.data.message;
-
-    try {
-      // Parse message data
-      const data: VideoFixMessage = message.json;
-      const {fixId, videoId, userId} = data;
-
-      logger.info("videoFixWorker:received", {fixId, videoId, userId});
-
-      // Process the video fix
-      await VideoFixService.processVideoFix(fixId);
-
-      logger.info("videoFixWorker:completed", {fixId, videoId, userId});
-    } catch (error) {
-      logger.error("videoFixWorker:failed", {
-        error: error instanceof Error ? error.message : String(error),
-        messageId: message.messageId,
-      });
-
-      // Do not re-throw to prevent infinite Pub/Sub retries
-      // The VideoFixService already handles failure status updates
     }
   }
 );

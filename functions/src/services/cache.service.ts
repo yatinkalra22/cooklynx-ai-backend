@@ -164,35 +164,6 @@ export class CacheService {
     return this.get<T>(CACHE_KEYS.analysis(imageId));
   }
 
-  static async cacheFixResult(fixId: string, result: unknown): Promise<void> {
-    this.set(CACHE_KEYS.fixResult(fixId), result, CACHE_TTL.FIX_RESULT).catch(
-      () => {}
-    );
-  }
-
-  static async getFixResult<T>(fixId: string): Promise<T | null> {
-    return this.get<T>(CACHE_KEYS.fixResult(fixId));
-  }
-
-  static async cacheFixSignature(
-    imageId: string,
-    signature: string,
-    fixId: string
-  ): Promise<void> {
-    this.set(
-      CACHE_KEYS.fixBySignature(imageId, signature),
-      fixId,
-      CACHE_TTL.FIX_RESULT
-    ).catch(() => {});
-  }
-
-  static async getFixBySignature(
-    imageId: string,
-    signature: string
-  ): Promise<string | null> {
-    return this.get<string>(CACHE_KEYS.fixBySignature(imageId, signature));
-  }
-
   static async cacheUserCredits(
     userId: string,
     credit: number,
@@ -227,64 +198,12 @@ export class CacheService {
     Promise.all([
       this.delete(CACHE_KEYS.imageMetadata(imageId)),
       this.delete(CACHE_KEYS.analysis(imageId)),
-      this.delete(CACHE_KEYS.fixIndex(imageId)),
     ]).catch(() => {});
   }
 
-  static async invalidateFixCache(
-    fixId: string,
-    imageId?: string,
-    signature?: string
-  ): Promise<void> {
-    const promises = [this.delete(CACHE_KEYS.fixResult(fixId))];
-    if (imageId) {
-      promises.push(this.delete(CACHE_KEYS.fixIndex(imageId)));
-      if (signature) {
-        promises.push(
-          this.delete(CACHE_KEYS.fixBySignature(imageId, signature))
-        );
-      }
-    }
-    Promise.all(promises).catch(() => {});
-  }
-
   // ============================================
-  // Video Fix Cache Helpers (all NON-BLOCKING)
+  // Video Cache Helpers (all NON-BLOCKING)
   // ============================================
-
-  static async cacheVideoFixResult(
-    fixId: string,
-    result: unknown
-  ): Promise<void> {
-    this.set(
-      CACHE_KEYS.videoFixResult(fixId),
-      result,
-      CACHE_TTL.FIX_RESULT
-    ).catch(() => {});
-  }
-
-  static async getVideoFixResult<T>(fixId: string): Promise<T | null> {
-    return this.get<T>(CACHE_KEYS.videoFixResult(fixId));
-  }
-
-  static async cacheVideoFixSignature(
-    videoId: string,
-    signature: string,
-    fixId: string
-  ): Promise<void> {
-    this.set(
-      CACHE_KEYS.videoFixBySignature(videoId, signature),
-      fixId,
-      CACHE_TTL.FIX_RESULT
-    ).catch(() => {});
-  }
-
-  static async getVideoFixBySignature(
-    videoId: string,
-    signature: string
-  ): Promise<string | null> {
-    return this.get<string>(CACHE_KEYS.videoFixBySignature(videoId, signature));
-  }
 
   static async cacheVideoHash(
     userId: string,
@@ -303,22 +222,5 @@ export class CacheService {
     hash: string
   ): Promise<string | null> {
     return this.get<string>(CACHE_KEYS.videoHash(userId, hash));
-  }
-
-  static async invalidateVideoFixCache(
-    fixId: string,
-    videoId?: string,
-    signature?: string
-  ): Promise<void> {
-    const promises = [this.delete(CACHE_KEYS.videoFixResult(fixId))];
-    if (videoId) {
-      promises.push(this.delete(CACHE_KEYS.videoFixIndex(videoId)));
-      if (signature) {
-        promises.push(
-          this.delete(CACHE_KEYS.videoFixBySignature(videoId, signature))
-        );
-      }
-    }
-    Promise.all(promises).catch(() => {});
   }
 }
