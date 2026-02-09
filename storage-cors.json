@@ -1,0 +1,19 @@
+[
+  {
+    "origin": [
+      "https://cooklynx-ai.firebaseapp.com",
+      "https://cooklynx-ai.web.app",
+      "https://cooklynx-ai.vercel.app",
+      "http://localhost:3000",
+      "http://localhost:8081"
+    ],
+    "method": ["GET", "HEAD", "PUT", "POST", "DELETE"],
+    "maxAgeSeconds": 3600,
+    "responseHeader": [
+      "Content-Type",
+      "Content-Length",
+      "Content-Disposition",
+      "Cache-Control"
+    ]
+  }
+]

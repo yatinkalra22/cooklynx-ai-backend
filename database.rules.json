@@ -1,0 +1,37 @@
+{
+  "rules": {
+    "images": {
+      ".indexOn": ["userId"]
+    },
+    "analysis": {
+      ".indexOn": ["userId"]
+    },
+    "fixes": {
+      ".indexOn": ["userId"]
+    },
+    "imageFixIndex": {
+      "$imageId": {
+        ".indexOn": ["version"]
+      }
+    },
+    "videos": {
+      ".indexOn": ["userId"]
+    },
+    "videoAnalysis": {
+      ".indexOn": ["userId"]
+    },
+    "videoHashes": {
+      "$userId": {
+        ".indexOn": [".value"]
+      }
+    },
+    "videoFixes": {
+      ".indexOn": ["userId"]
+    },
+    "videoFixIndex": {
+      "$videoId": {
+        ".indexOn": ["version"]
+      }
+    }
+  }
+}

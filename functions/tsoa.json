@@ -1,0 +1,71 @@
+{
+  "entryFile": "src/index.ts",
+  "noImplicitAdditionalProperties": "throw-on-extras",
+  "controllerPathGlobs": ["src/controllers/**/*.controller.ts"],
+  "spec": {
+    "outputDirectory": "src/generated",
+    "specVersion": 3,
+    "securityDefinitions": {
+      "BearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "Firebase ID token or custom token"
+      }
+    },
+    "tags": [
+      {
+        "name": "Health",
+        "description": "Health check endpoints"
+      },
+      {
+        "name": "Auth",
+        "description": "Authentication and user management"
+      },
+      {
+        "name": "Images",
+        "description": "Image upload and AI analysis"
+      },
+      {
+        "name": "Fixes",
+        "description": "AI-powered image fix generation and version comparison"
+      }
+    ],
+    "spec": {
+      "info": {
+        "title": "CookLynx AI API",
+        "version": "1.0.0",
+        "description": "REST API for CookLynx AI - Recipe and cooking powered by AI",
+        "contact": {
+          "name": "API Support"
+        }
+      },
+      "servers": [
+        {
+          "url": "http://localhost:5001/{projectId}/us-central1/api",
+          "description": "Local Firebase Emulator",
+          "variables": {
+            "projectId": {
+              "default": "cooklynx-ai"
+            }
+          }
+        },
+        {
+          "url": "https://us-central1-{projectId}.cloudfunctions.net/api",
+          "description": "Production",
+          "variables": {
+            "projectId": {
+              "default": "cooklynx-ai"
+            }
+          }
+        }
+      ]
+    }
+  },
+  "routes": {
+    "routesDir": "src/generated",
+    "basePath": "/",
+    "middleware": "express",
+    "authenticationModule": "src/middleware/tsoa-auth.middleware.ts"
+  }
+}
