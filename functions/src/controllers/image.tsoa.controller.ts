@@ -207,7 +207,7 @@ export class ImageController extends Controller {
 
       // Start async analysis (don't wait for it)
       this.analyzeImageAsync(user.uid, imageMetadata.imageId).catch((error) => {
-        console.error("Analysis error:", error);
+        logger.error("Analysis error:", error);
       });
 
       this.setStatus(201);
@@ -273,7 +273,7 @@ export class ImageController extends Controller {
       });
 
       // Run AI analysis
-      const analysis = await AIService.analyzeRoom(userId, imageId);
+      const analysis = await AIService.analyzeFood(userId, imageId);
 
       const analysisData = {
         imageId,
@@ -285,11 +285,13 @@ export class ImageController extends Controller {
       await Promise.all([
         // Save analysis results to database
         database.ref(`analysis/${imageId}`).set(analysisData),
-        // Update image status to completed with overall score
+        // Update image status to completed
         database.ref(`images/${imageId}`).update({
           analysisStatus: "completed",
           analyzedAt: new Date().toISOString(),
-          overallScore: analysis.overall.score,
+          // Food analysis doesn't have an overall score in the same way, 
+          // but we can use the number of items or just 100 if successful
+          overallScore: analysis.items.length > 0 ? 100 : 0,
         }),
         // Increment user's completed photos counter
         UserService.incrementUserPhotoCounters(userId, {
@@ -304,10 +306,10 @@ export class ImageController extends Controller {
       logger.info("analysis:completed", {
         userId,
         imageId,
-        score: analysis.overall.score,
+        itemsCount: analysis.items.length,
       });
     } catch (error) {
-      console.error("Analysis failed:", error);
+      logger.error("Analysis failed:", error);
 
       // OPTIMIZATION: Batch failure database operations in parallel
       await Promise.all([
@@ -321,6 +323,56 @@ export class ImageController extends Controller {
         // Invalidate any cached data for this image
         CacheService.delete(CACHE_KEYS.imageMetadata(imageId)),
       ]);
+    }
+  }
+
+  /**
+   * Get image metadata and details.
+   * Returns full image information including storage path, dimensions, and analysis status.
+   * @summary Get image details
+   * @param imageId Unique image identifier
+   */
+  @Get("{imageId}")
+  @Response<ErrorResponse>(401, "Unauthorized")
+  @Response<ErrorResponse>(403, "Forbidden - not the owner")
+  @Response<ErrorResponse>(404, "Image not found")
+  @Response<ErrorResponse>(500, "Internal server error")
+  public async getImage(
+    @Request() request: ExpressRequest,
+    @Path() imageId: string
+  ): Promise<ImageMetadata> {
+    const user = request.user as AuthUser;
+
+    try {
+      // Get image metadata
+      const imageSnapshot = await database.ref(`images/${imageId}`).get();
+
+      if (!imageSnapshot.exists()) {
+        this.setStatus(404);
+        throw {error: "Not Found", message: "Image not found"};
+      }
+
+      const imageData = imageSnapshot.val() as ImageMetadata;
+
+      // Check ownership
+      if (imageData.userId !== user.uid) {
+        this.setStatus(403);
+        throw {
+          error: "Forbidden",
+          message: "You do not have access to this image",
+        };
+      }
+
+      return imageData;
+    } catch (error: unknown) {
+      if ((error as {error?: string}).error) {
+        throw error;
+      }
+      this.setStatus(500);
+      throw {
+        error: "Internal Server Error",
+        message: "Failed to get image details",
+      };
     }
   }
 
@@ -545,7 +597,7 @@ export class ImageController extends Controller {
 
       return result;
     } catch (error) {
-      console.error("Failed to list images:", error);
+      logger.error("Failed to list images:", error);
       this.setStatus(500);
       throw {error: "Internal Server Error", message: "Failed to list images"};
     }

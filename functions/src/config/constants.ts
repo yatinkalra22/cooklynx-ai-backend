@@ -31,7 +31,7 @@ export const COOLDOWN_MS = COOLDOWN_HOURS * 60 * 60 * 1000;
 // Content moderation - max violations before account is blocked
 export const MAX_CONTENT_VIOLATIONS = 3;
 
-// Beta limits - max uploads + fixes per account during hackathon
+// Beta limits - max uploads per account during hackathon
 export const BETA_USAGE_LIMIT = 20;
 
 // ============================================================================
@@ -40,9 +40,6 @@ export const BETA_USAGE_LIMIT = 20;
 
 // Credits consumed per image analysis
 export const IMAGE_CREDIT_COST = 1;
-
-// Credits consumed per image fix
-export const IMAGE_FIX_CREDIT_COST = 1;
 
 // ============================================================================
 // Video Processing
@@ -56,9 +53,6 @@ export const VIDEO_MAX_DURATION = 60;
 
 // Credits consumed per video analysis
 export const VIDEO_CREDIT_COST = 2;
-
-// Credits consumed per video fix
-export const VIDEO_FIX_CREDIT_COST = 2;
 
 // Allowed video mime types
 export const VIDEO_ALLOWED_MIME_TYPES = [

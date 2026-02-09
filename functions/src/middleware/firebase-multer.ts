@@ -1,5 +1,6 @@
 import {Request, Response, NextFunction} from "express";
 import Busboy from "busboy";
+import * as logger from "firebase-functions/logger";
 
 interface RawBodyRequest extends Request {
   rawBody?: Buffer;
@@ -110,7 +111,7 @@ function parseMultipartFromBuffer(
         });
 
         fileStream.on("error", (err) => {
-          console.error("File stream error:", err);
+          logger.error("File stream error:", err);
           resolveFile();
         });
       });

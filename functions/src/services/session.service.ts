@@ -1,6 +1,7 @@
 import {database} from "../config/firebase.config";
 import {randomUUID} from "crypto";
 import * as crypto from "crypto";
+import * as logger from "firebase-functions/logger";
 
 /**
  * Session management service for tracking active user sessions
@@ -65,7 +66,7 @@ export class SessionService {
     // Check device fingerprint
     const currentFingerprint = this.generateDeviceFingerprint(ip, userAgent);
     if (currentFingerprint !== session.deviceFingerprint) {
-      console.warn("Device fingerprint mismatch", {
+      logger.warn("Device fingerprint mismatch", {
         userId,
         sessionId,
         expected: session.deviceFingerprint,

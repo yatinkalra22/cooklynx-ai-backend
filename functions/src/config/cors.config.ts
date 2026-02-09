@@ -1,6 +1,7 @@
 /**
  * CORS configuration for API security
  */
+import * as logger from "firebase-functions/logger";
 
 // Allowed origins for CORS
 const allowedOrigins = [
@@ -42,7 +43,7 @@ export const corsOptions = {
     if (allowedOrigins.indexOf(origin) !== -1) {
       callback(null, true);
     } else {
-      console.warn("CORS blocked request from origin:", origin);
+      logger.warn("CORS blocked request from origin:", origin);
       callback(new Error("Not allowed by CORS"));
     }
   },

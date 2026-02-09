@@ -1,4 +1,5 @@
 import {auth} from "../config/firebase.config";
+import * as logger from "firebase-functions/logger";
 
 /**
  * Email service for sending verification and notification emails
@@ -57,12 +58,12 @@ export async function sendVerificationEmail(
     await auth.generateSignInWithEmailLink(email, actionCodeSettings);
     // Log sanitized version only (never log the actual link - contains token)
     const maskedEmail = email.replace(/(?<=.{2}).*(?=@)/, "***");
-    console.log(`Verification link generated for: ${maskedEmail}`);
+    logger.info(`Verification link generated for: ${maskedEmail}`);
   } catch (error: unknown) {
     const maskedEmail = email.replace(/(?<=.{2}).*(?=@)/, "***");
     const errorMessage =
       error instanceof Error ? error.message : "Unknown error";
-    console.error(
+    logger.error(
       `Failed to generate verification link for ${maskedEmail}:`,
       errorMessage
     );
