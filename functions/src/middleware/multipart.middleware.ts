@@ -1,5 +1,6 @@
 import {Request, Response, NextFunction} from "express";
 import Busboy from "busboy";
+import * as logger from "firebase-functions/logger";
 
 // File parsed from multipart form data
 export interface ParsedFile {
@@ -77,7 +78,7 @@ function collectAndParse(
   });
 
   req.on("error", (error: Error) => {
-    console.error("Request error:", error);
+    logger.error("Request error:", error);
     res.status(400).json({
       error: "Bad Request",
       message: "Failed to read request body",
@@ -132,7 +133,7 @@ function parseFromBuffer(
   });
 
   busboy.on("error", (error: Error) => {
-    console.error("Busboy error:", error);
+    logger.error("Busboy error:", error);
     res.status(400).json({
       error: "Bad Request",
       message: "Failed to parse multipart form data",

@@ -32,7 +32,7 @@ try {
   validateRequiredEnvironment();
   validateOptionalEnvironment();
 } catch (error) {
-  console.error("Environment validation failed:", error);
+  logger.error("Environment validation failed:", error);
   // In production, this will prevent the function from deploying
   throw error;
 }
@@ -156,7 +156,7 @@ try {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   swaggerDocument = require("./generated/swagger.json");
 } catch {
-  console.warn("Swagger spec not found. Run 'npm run swagger' to generate.");
+  logger.warn("Swagger spec not found. Run 'npm run swagger' to generate.");
 }
 
 if (swaggerDocument) {

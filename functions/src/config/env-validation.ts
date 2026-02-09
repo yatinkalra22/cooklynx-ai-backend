@@ -2,6 +2,7 @@
  * Environment variable validation
  * Ensures all required secrets and config are loaded on startup
  */
+import * as logger from "firebase-functions/logger";
 
 export function validateRequiredEnvironment(): void {
   // Skip validation in local/emulator environment
@@ -9,7 +10,7 @@ export function validateRequiredEnvironment(): void {
     process.env.FUNCTIONS_EMULATOR === "true" ||
     process.env.NODE_ENV === "development"
   ) {
-    console.log(
+    logger.info(
       "⚠ Running in development mode - skipping environment validation"
     );
     return;
@@ -22,16 +23,16 @@ export function validateRequiredEnvironment(): void {
   if (missing.length > 0) {
     // Only warn during deployment, don't throw error
     // Firebase secrets are injected at runtime, not during analysis
-    console.warn(
+    logger.warn(
       `⚠ Warning: Some environment variables not found during deployment analysis: ${missing.join(", ")}`
     );
-    console.warn(
+    logger.warn(
       "These will be injected from Firebase Secret Manager at runtime."
     );
     return;
   }
 
-  console.log("All required environment variables are present");
+  logger.info("All required environment variables are present");
 }
 
 /**
@@ -46,7 +47,7 @@ export function validateOptionalEnvironment(): void {
 
   for (const [key, warning] of Object.entries(optional)) {
     if (!process.env[key]) {
-      console.warn(`⚠ ${key} not set: ${warning}`);
+      logger.warn(`⚠ ${key} not set: ${warning}`);
     }
   }
 }

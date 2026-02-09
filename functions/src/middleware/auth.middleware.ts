@@ -1,5 +1,6 @@
 import {Request, Response, NextFunction} from "express";
 import {auth} from "../config/firebase.config";
+import * as logger from "firebase-functions/logger";
 
 /**
  * Extended Express Request with user data
@@ -104,7 +105,7 @@ export async function requireAuth(
   } catch (error: unknown) {
     const errorMessage =
       error instanceof Error ? error.message : "Authentication failed";
-    console.error("Auth error:", errorMessage);
+    logger.error("Auth error:", errorMessage);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const errorCode = (error as any).code;
     if (errorCode === "auth/id-token-expired") {

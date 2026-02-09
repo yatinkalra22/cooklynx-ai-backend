@@ -43,6 +43,7 @@ import {
   FIREBASE_ERROR_CODES,
   HTTP_STATUS,
 } from "../config/constants";
+import * as logger from "firebase-functions/logger";
 import {UserService} from "../services/user.service";
 import {
   validatePasswordStrength,
@@ -152,7 +153,7 @@ export class AuthController extends Controller {
         });
       } catch (emailError) {
         // Log error but don't fail signup - user can request resend later
-        console.error("Failed to generate verification link:", emailError);
+        logger.error("Failed to generate verification link:", emailError);
       }
 
       this.setStatus(HTTP_STATUS.CREATED);

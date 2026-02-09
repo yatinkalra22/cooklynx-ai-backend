@@ -650,7 +650,7 @@ export class FixService {
       try {
         await StorageService.deleteFixedImage(userId, fixId);
       } catch (error) {
-        console.error("Failed to delete fixed image:", error);
+        logger.error("Failed to delete fixed image:", error);
       }
     }
 

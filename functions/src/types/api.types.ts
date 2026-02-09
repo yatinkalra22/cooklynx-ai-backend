@@ -316,6 +316,26 @@ export interface RoomAnalysis {
 }
 
 /**
+ * Food item / Ingredient identified in image
+ */
+export interface Ingredient {
+  name: string;
+  category: string;
+  notes: string;
+  confidence: number;
+}
+
+/**
+ * Complete food analysis result
+ */
+export interface FoodAnalysis {
+  items: Ingredient[];
+  summary: string;
+  analyzedAt: string;
+  version: string;
+}
+
+/**
  * Response when analysis is pending
  */
 export interface AnalysisPendingResponse {
@@ -341,7 +361,7 @@ export interface AnalysisCompletedResponse {
     storagePath: string;
     uploadedAt: string;
   };
-  analysis: RoomAnalysis;
+  analysis: RoomAnalysis | FoodAnalysis;
 }
 
 /**
