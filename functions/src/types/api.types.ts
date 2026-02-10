@@ -327,12 +327,15 @@ export interface Ingredient {
 
 /**
  * Complete food analysis result
+ * Includes optional recipe recommendations generated at analysis time
  */
 export interface FoodAnalysis {
   items: Ingredient[];
   summary: string;
   analyzedAt: string;
   version: string;
+  /** Recipe recommendations based on detected ingredients (optional for backwards compatibility) */
+  recommendations?: RecipeRecommendationResponse;
 }
 
 /**
