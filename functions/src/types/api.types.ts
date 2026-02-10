@@ -336,6 +336,28 @@ export interface FoodAnalysis {
 }
 
 /**
+ * Recipe recommendation based on ingredients
+ */
+export interface RecipeRecommendation {
+  name: string;
+  description: string;
+  ingredientsUsed: string[];
+  additionalIngredientsNeeded: string[];
+  cookingTime: string;
+  difficulty: "easy" | "medium" | "hard";
+  instructions: string[];
+}
+
+/**
+ * Response with recipe recommendations
+ */
+export interface RecipeRecommendationResponse {
+  recommendations: RecipeRecommendation[];
+  summary: string;
+  analyzedAt: string;
+}
+
+/**
  * Response when analysis is pending
  */
 export interface AnalysisPendingResponse {

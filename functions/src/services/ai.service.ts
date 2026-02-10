@@ -3,7 +3,11 @@ import {
   geminiModerationModel,
 } from "../config/firebase.config";
 import {StorageService} from "./storage.service";
-import {FoodAnalysis} from "../types/api.types";
+import {
+  FoodAnalysis,
+  RecipeRecommendationResponse,
+  Ingredient,
+} from "../types/api.types";
 import * as logger from "firebase-functions/logger";
 
 /**
@@ -254,6 +258,100 @@ Be precise and helpful. Return ONLY valid JSON.
       analyzedAt: new Date().toISOString(),
       version: "1.0",
     };
+  }
+
+  /**
+   * Recommend recipes based on ingredients
+   */
+  static async recommendRecipes(
+    ingredients: Ingredient[]
+  ): Promise<RecipeRecommendationResponse> {
+    const prompt = this.buildRecipeRecommendationPrompt(ingredients);
+
+    const requestGeminiRecommendation = () =>
+      geminiModel.generateContent([{text: prompt}]);
+
+    const result =
+      process.env.GEMINI_ENABLE_RETRY === "true"
+        ? await this.withGeminiRetry(requestGeminiRecommendation)
+        : await requestGeminiRecommendation();
+
+    const response = await result.response;
+    const text = response.text();
+
+    return this.parseRecipeAIResponse(text);
+  }
+
+  /**
+   * Build recipe recommendation prompt
+   */
+  private static buildRecipeRecommendationPrompt(
+    ingredients: Ingredient[]
+  ): string {
+    const ingredientList = ingredients.map((i) => i.name).join(", ");
+    return `
+You are an expert chef. Based on the following list of ingredients, recommend 3 creative and delicious dishes that can be prepared.
+
+**Ingredients available:** ${ingredientList}
+
+For each dish, provide:
+1. "name": Name of the dish
+2. "description": A brief, appetizing description
+3. "ingredientsUsed": Which of the available ingredients are used
+4. "additionalIngredientsNeeded": Any common pantry staples or minor ingredients needed that were not in the list
+5. "cookingTime": Estimated time to prepare and cook
+6. "difficulty": Difficulty level ("easy", "medium", or "hard")
+7. "instructions": Step-by-step cooking instructions
+
+Analyze the ingredients and return ONLY a valid JSON object (no markdown, no explanations).
+
+**Response format (JSON only):**
+{
+  "recommendations": [
+    {
+      "name": "Dish Name",
+      "description": "Description...",
+      "ingredientsUsed": ["ingredient1", "ingredient2"],
+      "additionalIngredientsNeeded": ["salt", "oil"],
+      "cookingTime": "30 mins",
+      "difficulty": "easy",
+      "instructions": ["Step 1...", "Step 2..."]
+    }
+  ],
+  "summary": "Short overview of why these dishes were chosen"
+}
+
+Be precise and helpful. Return ONLY valid JSON.
+`;
+  }
+
+  /**
+   * Parse AI response for recipe recommendations
+   */
+  private static parseRecipeAIResponse(
+    responseText: string
+  ): RecipeRecommendationResponse {
+    try {
+      let cleanText = responseText.trim();
+      if (cleanText.startsWith("```json")) {
+        cleanText = cleanText.replace(/```json\n?/g, "").replace(/```\n?/g, "");
+      } else if (cleanText.startsWith("```")) {
+        cleanText = cleanText.replace(/```\n?/g, "");
+      }
+
+      const parsed = JSON.parse(cleanText);
+
+      return {
+        ...parsed,
+        analyzedAt: new Date().toISOString(),
+      };
+    } catch (error) {
+      return {
+        recommendations: [],
+        summary: "Could not generate recommendations. Please try again.",
+        analyzedAt: new Date().toISOString(),
+      };
+    }
   }
 
   /**
