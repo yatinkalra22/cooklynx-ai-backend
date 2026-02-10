@@ -29,6 +29,10 @@
       {
         "name": "Fixes",
         "description": "AI-powered image fix generation and version comparison"
+      },
+      {
+        "name": "Recipes",
+        "description": "Recipe extraction from video URLs"
       }
     ],
     "spec": {

@@ -189,7 +189,8 @@ export type CreditTransactionType =
   | "image_analysis"
   | "image_fix"
   | "video_analysis"
-  | "video_fix";
+  | "video_fix"
+  | "url_recipe_extraction";
 
 export interface CreditLedgerEntry {
   type: CreditTransactionType;

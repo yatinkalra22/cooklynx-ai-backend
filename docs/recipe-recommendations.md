@@ -292,15 +292,33 @@ Monitor:
 - `analysis.recommendations` is undefined
 - User gets analysis without recipes
 
+## Related: URL Recipe Extraction
+
+In addition to generating recipes from detected ingredients (this document),
+the system also supports **extracting recipes from any URL** (YouTube videos,
+Instagram posts, recipe blogs, etc.).
+
+See [URL Recipe Extraction Architecture](url-recipe-extraction.md) for details.
+
+Key differences:
+
+| Feature | Image Recommendations (this doc) | URL Extraction |
+|---------|--------------------------------|----------------|
+| Input | Uploaded food photo | Any URL |
+| AI Task | Detect ingredients + suggest recipes | Extract exact recipe from video/page |
+| Output | 3 recipe suggestions (basic) | 1 detailed recipe (quantities, steps, timings) |
+| Grocery-list ready | No (ingredient names only) | Yes (quantities, units, categories) |
+| Cost | Included in image analysis (1 credit) | 1 credit per URL |
+
 ## Future Enhancements
 
 1. **User Preferences**: Filter recommendations by dietary restrictions
 2. **Trending Recipes**: Popular recipes for ingredient combinations
 3. **Seasonal Suggestions**: Time-aware recommendations
 4. **ML Optimization**: Predict which recipes users will actually cook
+5. **Cross-feature**: Link image ingredients to URL-extracted recipes for grocery list
 
 ---
 
-**Last Updated**: February 10, 2026  
-**Version**: 2.0 (Per-image architecture)  
-**Maintainer**: Backend Team
+**Last Updated**: February 10, 2026
+**Version**: 2.1 (Added URL extraction cross-reference)

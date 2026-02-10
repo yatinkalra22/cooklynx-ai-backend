@@ -4,10 +4,12 @@
  */
 
 import {PubSub} from "@google-cloud/pubsub";
+import {VideoPlatform} from "../types/recipe-url.types";
 
 // Pub/Sub topic names
 export const PUBSUB_TOPICS = {
   VIDEO_ANALYSIS_QUEUE: "video-analysis-queue",
+  URL_RECIPE_EXTRACTION_QUEUE: "url-recipe-extraction-queue",
 } as const;
 
 // Singleton Pub/Sub client
@@ -49,5 +51,22 @@ export async function publishVideoAnalysisJob(
   return publishMessage(PUBSUB_TOPICS.VIDEO_ANALYSIS_QUEUE, {
     videoId,
     userId,
+  });
+}
+
+/**
+ * Publish a URL recipe extraction job to the queue
+ */
+export async function publishUrlExtractionJob(
+  urlId: string,
+  userId: string,
+  sourceUrl: string,
+  platform: VideoPlatform
+): Promise<string> {
+  return publishMessage(PUBSUB_TOPICS.URL_RECIPE_EXTRACTION_QUEUE, {
+    urlId,
+    userId,
+    sourceUrl,
+    platform,
   });
 }
