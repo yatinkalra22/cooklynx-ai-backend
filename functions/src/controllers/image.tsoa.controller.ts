@@ -27,8 +27,6 @@ import {
   ErrorResponse,
   ImageMetadata,
   RoomAnalysis,
-  FoodAnalysis,
-  RecipeRecommendationResponse,
 } from "../types/api.types";
 import {AuthUser} from "../middleware/tsoa-auth.middleware";
 import * as logger from "firebase-functions/logger";
@@ -602,82 +600,6 @@ export class ImageController extends Controller {
       logger.error("Failed to list images:", error);
       this.setStatus(500);
       throw {error: "Internal Server Error", message: "Failed to list images"};
-    }
-  }
-
-  /**
-   * Get recipe recommendations based on ingredients found in an image.
-   * Analysis must be completed first.
-   * @summary Get recipe recommendations for an image
-   * @param imageId Unique image identifier
-   */
-  @Get("{imageId}/recommendations")
-  @Response<ErrorResponse>(401, "Unauthorized")
-  @Response<ErrorResponse>(403, "Forbidden - not the owner")
-  @Response<ErrorResponse>(404, "Image or analysis not found")
-  @Response<ErrorResponse>(500, "Internal server error")
-  public async getRecipeRecommendations(
-    @Request() request: ExpressRequest,
-    @Path() imageId: string
-  ): Promise<RecipeRecommendationResponse> {
-    const user = request.user as AuthUser;
-
-    try {
-      // Get image metadata to verify ownership and status
-      const imageSnapshot = await database.ref(`images/${imageId}`).get();
-      if (!imageSnapshot.exists()) {
-        this.setStatus(404);
-        throw {error: "Not Found", message: "Image not found"};
-      }
-
-      const imageData = imageSnapshot.val();
-      if (imageData.userId !== user.uid) {
-        this.setStatus(403);
-        throw {
-          error: "Forbidden",
-          message: "You don't have access to this image",
-        };
-      }
-
-      if (imageData.analysisStatus !== "completed") {
-        this.setStatus(400);
-        throw {
-          error: "Bad Request",
-          message: "Analysis is not yet completed for this image",
-        };
-      }
-
-      // Get analysis results
-      const analysisSnapshot = await database.ref(`analysis/${imageId}`).get();
-      if (!analysisSnapshot.exists()) {
-        this.setStatus(404);
-        throw {error: "Not Found", message: "Analysis results not found"};
-      }
-
-      const analysis = analysisSnapshot.val() as FoodAnalysis;
-
-      if (!analysis.items || analysis.items.length === 0) {
-        return {
-          recommendations: [],
-          summary:
-            "No ingredients were identified in this image to base recommendations on.",
-          analyzedAt: new Date().toISOString(),
-        };
-      }
-
-      // Get recommendations from AI
-      const recommendations = await AIService.recommendRecipes(analysis.items);
-
-      return recommendations;
-    } catch (error: unknown) {
-      if ((error as {error?: string}).error) {
-        throw error;
-      }
-      this.setStatus(500);
-      throw {
-        error: "Internal Server Error",
-        message: "Failed to get recipe recommendations",
-      };
     }
   }
 }

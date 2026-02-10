@@ -228,22 +228,6 @@ GET / api / images / {imageId};
 - ✅ Recommendations cached with analysis
 - ✅ Consistent data structure
 
-### For Custom Ingredients (Optional)
-
-Only use this if you have custom ingredients NOT from an image:
-
-```typescript
-POST /api/recipes/recommend
-{
-  "ingredients": [
-    {"name": "Custom Item 1", "category": "..."},
-    {"name": "Custom Item 2", "category": "..."}
-  ]
-}
-```
-
-This calls the AI directly (not cached, since it's custom user input).
-
 ## API Response Example
 
 ```json
@@ -307,19 +291,6 @@ Monitor:
 - Error logged, but not thrown
 - `analysis.recommendations` is undefined
 - User gets analysis without recipes
-
-### Standalone Recipe API
-
-Still available for custom ingredient lists:
-
-```typescript
-POST /api/recipes/recommend
-{
-  "ingredients": [...]
-}
-```
-
-Calls AI directly (not cached, as it's user-provided ingredients)
 
 ## Future Enhancements
 
