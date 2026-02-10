@@ -327,12 +327,37 @@ export interface Ingredient {
 
 /**
  * Complete food analysis result
+ * Includes optional recipe recommendations generated at analysis time
  */
 export interface FoodAnalysis {
   items: Ingredient[];
   summary: string;
   analyzedAt: string;
   version: string;
+  /** Recipe recommendations based on detected ingredients (optional for backwards compatibility) */
+  recommendations?: RecipeRecommendationResponse;
+}
+
+/**
+ * Recipe recommendation based on ingredients
+ */
+export interface RecipeRecommendation {
+  name: string;
+  description: string;
+  ingredientsUsed: string[];
+  additionalIngredientsNeeded: string[];
+  cookingTime: string;
+  difficulty: "easy" | "medium" | "hard";
+  instructions: string[];
+}
+
+/**
+ * Response with recipe recommendations
+ */
+export interface RecipeRecommendationResponse {
+  recommendations: RecipeRecommendation[];
+  summary: string;
+  analyzedAt: string;
 }
 
 /**

@@ -129,6 +129,7 @@ Be STRICT about safety. When in doubt, mark as unsafe. CSAM detection must have 
 
   /**
    * Analyze food image with Gemini AI
+   * Automatically generates recipe recommendations based on detected items
    */
   static async analyzeFood(
     userId: string,
@@ -136,22 +137,26 @@ Be STRICT about safety. When in doubt, mark as unsafe. CSAM detection must have 
   ): Promise<FoodAnalysis> {
     // Download image from storage
     const imageBuffer = await StorageService.downloadImage(userId, imageId);
-    return this.analyzeFoodImageBuffer(imageBuffer);
+    return this.analyzeFoodImageBuffer(imageBuffer, true);
   }
 
   /**
    * Analyze a provided food image buffer
+   * OPTIMIZED: Single AI call analyzes ingredients AND generates recipes together
+   * @param imageBuffer - Image to analyze
+   * @param includeRecommendations - Whether to generate recipe recommendations (default: true)
    */
   static async analyzeFoodImageBuffer(
-    imageBuffer: Buffer
+    imageBuffer: Buffer,
+    includeRecommendations = true
   ): Promise<FoodAnalysis> {
     // Convert to base64 for Gemini
     const base64Image = imageBuffer.toString("base64");
 
-    // Build analysis prompt
-    const prompt = this.buildFoodAnalysisPrompt();
+    // Build combined analysis + recommendation prompt
+    const prompt = this.buildFoodAnalysisPrompt(includeRecommendations);
 
-    // Call Gemini API
+    // Single AI call for both analysis and recommendations
     const requestGeminiAnalysis = () =>
       geminiModel.generateContent([
         {
@@ -171,29 +176,35 @@ Be STRICT about safety. When in doubt, mark as unsafe. CSAM detection must have 
     const response = await result.response;
     const text = response.text();
 
-    // Parse AI response (expecting JSON)
-    const analysis = this.parseFoodAIResponse(text);
+    // Parse AI response (includes both analysis and recommendations if requested)
+    const analysis = this.parseFoodAIResponse(text, includeRecommendations);
 
     return analysis;
   }
 
   /**
    * Build food analysis prompt
+   * OPTIMIZED: Combines ingredient detection + recipe recommendations in one prompt
    */
-  private static buildFoodAnalysisPrompt(): string {
-    return `
-You are an expert culinary assistant and nutritionist. Analyze this image to identify food items, ingredients, and products.
+  private static buildFoodAnalysisPrompt(
+    includeRecommendations = true
+  ): string {
+    const basePrompt = `You are an expert culinary assistant and nutritionist. Analyze this image to identify food items, ingredients, and products.`;
 
-Analyze the image and return ONLY a valid JSON object (no markdown, no explanations).
-
+    const analysisInstructions = `
 For each item identified, provide:
 1. "name": Common name of the ingredient or food item
 2. "category": Category (e.g., Produce, Dairy, Meat, Pantry, Bakery, etc.)
 3. "notes": Brief notes about the item (e.g., ripeness, quantity, brand if visible, or suggestions for use)
-4. "confidence": A score from 0 to 1 for identification accuracy
+4. "confidence": A score from 0 to 1 for identification accuracy`;
+
+    if (!includeRecommendations) {
+      return `${basePrompt}
+
+Analyze the image and return ONLY a valid JSON object (no markdown, no explanations).
+${analysisInstructions}
 
 **Response format (JSON only):**
-
 {
   "items": [
     {
@@ -201,25 +212,78 @@ For each item identified, provide:
       "category": "Dairy",
       "notes": "Half-full carton, Horizon brand",
       "confidence": 0.95
-    },
-    {
-      "name": "Avocado",
-      "category": "Produce",
-      "notes": "Appears ripe and ready to use",
-      "confidence": 0.9
     }
   ],
   "summary": "Short 1-2 sentence overview of the items found in the image"
 }
 
-Be precise and helpful. Return ONLY valid JSON.
-`;
+Be precise and helpful. Return ONLY valid JSON.`;
+    }
+
+    // Combined prompt: Analysis + Recommendations in ONE AI call
+    return `${basePrompt}
+
+**TASK 1: Identify Ingredients**
+${analysisInstructions}
+
+**TASK 2: Recommend Recipes**
+Based on the identified ingredients, recommend 3 creative and delicious dishes that can be prepared.
+
+For each dish, provide:
+1. "name": Name of the dish
+2. "description": A brief, appetizing description
+3. "ingredientsUsed": Which of the detected ingredients are used
+4. "additionalIngredientsNeeded": Any common pantry staples or minor ingredients needed
+5. "cookingTime": Estimated time to prepare and cook
+6. "difficulty": Difficulty level ("easy", "medium", or "hard")
+7. "instructions": Step-by-step cooking instructions (array of strings)
+
+Analyze the image and return ONLY a valid JSON object (no markdown, no explanations).
+
+**Response format (JSON only):**
+{
+  "items": [
+    {
+      "name": "Chicken Breast",
+      "category": "Meat",
+      "notes": "Fresh, about 2 pieces",
+      "confidence": 0.95
+    },
+    {
+      "name": "Rice",
+      "category": "Grain",
+      "notes": "White rice, appears to be jasmine",
+      "confidence": 0.9
+    }
+  ],
+  "summary": "Short 1-2 sentence overview of the items found",
+  "recommendations": {
+    "recommendations": [
+      {
+        "name": "Chicken Fried Rice",
+        "description": "Classic Asian-inspired dish...",
+        "ingredientsUsed": ["Chicken Breast", "Rice"],
+        "additionalIngredientsNeeded": ["soy sauce", "oil", "eggs"],
+        "cookingTime": "25 mins",
+        "difficulty": "easy",
+        "instructions": ["Step 1...", "Step 2..."]
+      }
+    ],
+    "summary": "Quick and easy meals using your ingredients"
+  }
+}
+
+Be precise and helpful. Return ONLY valid JSON.`;
   }
 
   /**
    * Parse AI response to structured food analysis
+   * Handles both analysis-only and analysis+recommendations responses
    */
-  private static parseFoodAIResponse(responseText: string): FoodAnalysis {
+  private static parseFoodAIResponse(
+    responseText: string,
+    includeRecommendations = true
+  ): FoodAnalysis {
     try {
       // Remove markdown code blocks if present
       let cleanText = responseText.trim();
@@ -232,6 +296,16 @@ Be precise and helpful. Return ONLY valid JSON.
 
       const parsed = JSON.parse(cleanText);
 
+      // AI returns recommendations with timestamp, add it if not present
+      if (includeRecommendations && parsed.recommendations) {
+        if (!parsed.recommendations.analyzedAt) {
+          parsed.recommendations.analyzedAt = new Date().toISOString();
+        }
+        logger.info("Successfully parsed recommendations from AI response", {
+          recommendationCount: parsed.recommendations.recommendations?.length || 0,
+        });
+      }
+
       // Add metadata
       return {
         ...parsed,
@@ -239,6 +313,7 @@ Be precise and helpful. Return ONLY valid JSON.
         version: "1.0",
       };
     } catch (error) {
+      logger.error("Failed to parse AI response", {error});
       // Return fallback analysis
       return this.getFallbackFoodAnalysis();
     }
