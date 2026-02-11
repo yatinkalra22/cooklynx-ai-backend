@@ -15,6 +15,7 @@ import {Request as ExpressRequest} from "express";
 import {UrlRecipeService} from "../services/url-recipe.service";
 import {UserService} from "../services/user.service";
 import {CacheService} from "../services/cache.service";
+import {StorageService} from "../services/storage.service";
 import {CACHE_KEYS, CACHE_TTL} from "../config/redis.config";
 import {URL_EXTRACTION_CREDIT_COST} from "../config/constants";
 import {
@@ -22,10 +23,12 @@ import {
   ExtractRecipeFromUrlResponse,
   UrlExtractionStatusResponse,
   UrlExtractionListResponse,
+  CombinedAssetsResponse,
 } from "../types/recipe-url.types";
 import {ErrorResponse} from "../types/api.types";
 import {AuthUser} from "../middleware/tsoa-auth.middleware";
 import * as logger from "firebase-functions/logger";
+import {database} from "../config/firebase.config";
 
 interface AuthenticatedRequest extends ExpressRequest {
   user: AuthUser;
@@ -79,37 +82,50 @@ export class RecipeUrlController extends Controller {
     }
 
     try {
-      const {urlId} = await UrlRecipeService.submitUrl(
+      // Process synchronously - calls Gemini, saves to DB, returns full recipe
+      const result = await UrlRecipeService.extractRecipeSync(
         user.uid,
         body.url,
         validation.platform,
         validation.normalizedUrl
       );
 
-      logger.info("recipe-url:submit:success", {
+      logger.info("recipe-url:extract:success", {
         userId: user.uid,
-        urlId,
+        urlId: result.urlId,
         platform: validation.platform,
+        fromCache: result.fromCache,
+        isRecipeVideo: result.isRecipeVideo,
+        ingredientCount: result.recipe.ingredients.length,
       });
 
       this.setStatus(201);
       return {
-        message: "URL submitted for recipe extraction. Analysis queued.",
-        urlId,
+        message: result.fromCache
+          ? "Recipe found in cache. Instant results."
+          : "Recipe extracted successfully.",
+        urlId: result.urlId,
         sourceUrl: body.url,
         platform: validation.platform,
-        status: "queued",
+        status: "completed",
         creditsUsed: URL_EXTRACTION_CREDIT_COST,
+        fromCache: result.fromCache,
+        isRecipeVideo: result.isRecipeVideo,
+        confidence: result.confidence,
+        recipe: result.recipe,
       };
     } catch (error) {
       if ((error as {error?: string}).error) throw error;
 
-      logger.error("recipe-url:submit:failed", {
+      logger.error("recipe-url:extract:failed", {
         userId: user.uid,
         error: error instanceof Error ? error.message : String(error),
       });
       this.setStatus(500);
-      throw {error: "Internal Server Error", message: "Failed to submit URL"};
+      throw {
+        error: "Internal Server Error",
+        message: "Failed to extract recipe from URL",
+      };
     }
   }
 
@@ -196,7 +212,7 @@ export class RecipeUrlController extends Controller {
 
   /**
    * List all URL extractions by the authenticated user.
-   * Returns results in reverse chronological order (newest first).
+   * Returns results with full recipe data in reverse chronological order (newest first).
    * @summary List user's URL extractions
    */
   @Get("urls")
@@ -230,6 +246,109 @@ export class RecipeUrlController extends Controller {
       throw {
         error: "Internal Server Error",
         message: "Failed to list extractions",
+      };
+    }
+  }
+
+  /**
+   * Get a combined list of user's images and URL recipe extractions.
+   * Returns both image uploads and URL extractions in a single response.
+   * Useful for displaying all recipe content in one view.
+   * @summary Get combined images and URL recipes
+   */
+  @Get("combined")
+  @Security("BearerAuth")
+  @Response<ErrorResponse>(401, "Unauthorized")
+  @Response<ErrorResponse>(500, "Internal server error")
+  public async getCombinedAssets(
+    @Request() request: AuthenticatedRequest
+  ): Promise<CombinedAssetsResponse> {
+    const user = request.user;
+
+    try {
+      // Fetch both images and URL extractions in parallel
+      const [imagesSnapshot, urlExtractions] = await Promise.all([
+        database.ref("images").orderByChild("userId").equalTo(user.uid).get(),
+        UrlRecipeService.listExtractions(user.uid),
+      ]);
+
+      // Collect raw image data
+      const rawImages: Array<{
+        imageId: string;
+        uploadedAt: string;
+        originalName: string;
+        storagePath: string;
+        analysisStatus: string;
+      }> = [];
+      if (imagesSnapshot.exists()) {
+        imagesSnapshot.forEach((child) => {
+          const value = child.val();
+          if (!value || typeof value !== "object") return;
+
+          const img = value as {
+            imageId: string;
+            uploadedAt: string;
+            originalName: string;
+            analysisStatus: string;
+            storagePath: string;
+          };
+
+          rawImages.push({
+            imageId: img.imageId || child.key!,
+            uploadedAt: img.uploadedAt,
+            originalName: img.originalName,
+            storagePath: img.storagePath,
+            analysisStatus: img.analysisStatus,
+          });
+        });
+      }
+
+      // Sort images newest first
+      rawImages.sort(
+        (a, b) =>
+          new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime()
+      );
+
+      // Generate signed URLs for all images in parallel
+      const images = await Promise.all(
+        rawImages.map(async (img) => {
+          let thumbnailUrl = "";
+          try {
+            thumbnailUrl = await StorageService.getSignedUrl(
+              user.uid,
+              img.imageId
+            );
+          } catch {
+            logger.warn("combined:image-url-failed", {
+              imageId: img.imageId,
+            });
+          }
+          return {
+            imageId: img.imageId,
+            uploadedAt: img.uploadedAt,
+            fileName: img.originalName,
+            storagePath: img.storagePath,
+            thumbnailUrl,
+            analysisStatus: img.analysisStatus,
+          };
+        })
+      );
+
+      const result: CombinedAssetsResponse = {
+        images,
+        urlExtractions,
+      };
+
+      return result;
+    } catch (error) {
+      logger.error("recipe-url:combined:failed", {
+        userId: user.uid,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      this.setStatus(500);
+      throw {
+        error: "Internal Server Error",
+        message: "Failed to get combined assets",
       };
     }
   }

@@ -9,10 +9,10 @@
  */
 
 import axios from "axios";
+import * as crypto from "crypto";
 import {database, geminiModel} from "../config/firebase.config";
-import {publishUrlExtractionJob} from "../config/pubsub.config";
 import {CacheService} from "./cache.service";
-import {CACHE_KEYS, CACHE_TTL} from "../config/redis.config";
+import {CACHE_KEYS, CACHE_TTL, REDIS_ENABLED} from "../config/redis.config";
 import {URL_MAX_LENGTH, YOUTUBE_URL_PATTERNS} from "../config/constants";
 import {GEMINI_MODELS} from "../types/gemini.types";
 import {
@@ -22,6 +22,7 @@ import {
   VideoPlatform,
   RecipeUrlAnalysisStatus,
   UrlExtractionMessage,
+  SharedUrlRecipe,
 } from "../types/recipe-url.types";
 import * as logger from "firebase-functions/logger";
 
@@ -98,12 +99,15 @@ export class UrlRecipeService {
   static detectPlatform(url: string): VideoPlatform {
     const lower = url.toLowerCase();
     if (YOUTUBE_URL_PATTERNS.some((p) => p.test(lower))) return "youtube";
-    if (lower.includes("instagram.com") || lower.includes("instagr.am"))
+    if (lower.includes("instagram.com") || lower.includes("instagr.am")) {
       return "instagram";
-    if (lower.includes("tiktok.com") || lower.includes("vm.tiktok.com"))
+    }
+    if (lower.includes("tiktok.com") || lower.includes("vm.tiktok.com")) {
       return "tiktok";
-    if (lower.includes("facebook.com") || lower.includes("fb.watch"))
+    }
+    if (lower.includes("facebook.com") || lower.includes("fb.watch")) {
       return "facebook";
+    }
     return "unknown";
   }
 
@@ -140,46 +144,278 @@ export class UrlRecipeService {
   // ──────────────────────────────────────────
 
   /**
-   * Submit a URL for recipe extraction.
-   * Creates a DB record and publishes to Pub/Sub.
+   * Generate SHA-256 hash of normalized URL for deduplication
    */
-  static async submitUrl(
+  private static generateUrlHash(normalizedUrl: string): string {
+    return crypto.createHash("sha256").update(normalizedUrl).digest("hex");
+  }
+
+  /**
+   * Check if this URL has been processed before (across all users).
+   * Returns shared recipe data if found.
+   */
+  private static async checkSharedRecipe(
+    normalizedUrl: string
+  ): Promise<SharedUrlRecipe | null> {
+    const urlHash = this.generateUrlHash(normalizedUrl);
+    const shortHash = urlHash.slice(0, 16);
+
+    // Step 1: Check Redis cache (if available)
+    if (REDIS_ENABLED) {
+      const cachedRecipe = await CacheService.get<SharedUrlRecipe>(
+        CACHE_KEYS.urlHash(urlHash)
+      );
+      if (cachedRecipe) {
+        logger.info("url-recipe:dedup:cache-hit", {shortHash});
+        return cachedRecipe;
+      }
+    }
+
+    // Step 2: Check database
+    try {
+      const sharedRef = database.ref(`sharedUrlRecipes/${urlHash}`);
+      const snapshot = await sharedRef.get();
+
+      if (snapshot.exists()) {
+        const sharedRecipe = snapshot.val() as SharedUrlRecipe;
+
+        // Cache for future lookups
+        if (REDIS_ENABLED) {
+          CacheService.set(
+            CACHE_KEYS.urlHash(urlHash),
+            sharedRecipe,
+            CACHE_TTL.IMAGE_HASH // 30 days
+          ).catch(() => {});
+        }
+
+        logger.info("url-recipe:dedup:db-hit", {shortHash});
+        return sharedRecipe;
+      }
+    } catch (error) {
+      logger.error("url-recipe:dedup:check-failed", {
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+
+    logger.info("url-recipe:dedup:miss", {shortHash});
+    return null;
+  }
+
+  /**
+   * Save recipe to shared storage for future deduplication
+   */
+  private static async saveSharedRecipe(
+    normalizedUrl: string,
+    platform: VideoPlatform,
+    recipe: ExtractedRecipe,
+    confidence: number,
+    isRecipeVideo: boolean,
+    modelUsed: string,
+    userId: string
+  ): Promise<void> {
+    const urlHash = this.generateUrlHash(normalizedUrl);
+
+    try {
+      const sharedRef = database.ref(`sharedUrlRecipes/${urlHash}`);
+      const snapshot = await sharedRef.get();
+
+      if (snapshot.exists()) {
+        // Recipe already exists, increment counter
+        await sharedRef.update({
+          extractionCount: (snapshot.val().extractionCount || 1) + 1,
+        });
+      } else {
+        // First time this URL is processed
+        const sharedRecipe: SharedUrlRecipe = {
+          urlHash,
+          normalizedUrl,
+          platform,
+          recipe,
+          confidence,
+          isRecipeVideo,
+          modelUsed,
+          firstExtractedAt: new Date().toISOString(),
+          firstExtractedBy: userId,
+          extractionCount: 1,
+          version: "1.0",
+        };
+
+        await sharedRef.set(sharedRecipe);
+
+        // Cache it
+        if (REDIS_ENABLED) {
+          CacheService.set(
+            CACHE_KEYS.urlHash(urlHash),
+            sharedRecipe,
+            CACHE_TTL.IMAGE_HASH // 30 days
+          ).catch(() => {});
+        }
+      }
+
+      logger.info("url-recipe:shared-recipe:saved", {
+        urlHash: urlHash.slice(0, 16),
+      });
+    } catch (error) {
+      logger.error("url-recipe:shared-recipe:save-failed", {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      // Don't throw - this is not critical
+    }
+  }
+
+  /**
+   * Extract recipe from a URL synchronously.
+   * Checks dedup cache first, otherwise calls Gemini directly,
+   * saves all results to the database, and returns the full recipe.
+   */
+  static async extractRecipeSync(
     userId: string,
     sourceUrl: string,
     platform: VideoPlatform,
     normalizedUrl: string
-  ): Promise<{urlId: string}> {
+  ): Promise<{
+    urlId: string;
+    recipe: ExtractedRecipe;
+    confidence: number;
+    isRecipeVideo: boolean;
+    fromCache: boolean;
+  }> {
     const {v4: uuidv4} = await import("uuid");
     const urlId = `url_${uuidv4()}`;
     const submittedAt = new Date().toISOString();
+    const startTime = Date.now();
 
+    // Check if this URL has been processed before (deduplication)
+    const sharedRecipe = await this.checkSharedRecipe(normalizedUrl);
+
+    if (sharedRecipe && sharedRecipe.isRecipeVideo) {
+      logger.info("url-recipe:dedup:reusing", {
+        urlId,
+        userId,
+        platform,
+        urlHash: sharedRecipe.urlHash.slice(0, 16),
+      });
+
+      // Create metadata pointing to shared recipe (instant completion)
+      const metadata: UrlExtractionMetadata = {
+        urlId,
+        userId,
+        sourceUrl,
+        normalizedUrl,
+        platform,
+        analysisStatus: "completed",
+        videoTitle: sharedRecipe.recipe.title,
+        submittedAt,
+        completedAt: submittedAt,
+      };
+
+      const recipeResult: UrlRecipeResult = {
+        urlId,
+        userId,
+        sourceUrl,
+        platform,
+        recipe: sharedRecipe.recipe,
+        confidence: sharedRecipe.confidence,
+        isRecipeVideo: sharedRecipe.isRecipeVideo,
+        modelUsed: sharedRecipe.modelUsed,
+        processingDurationMs: 0,
+        analyzedAt: submittedAt,
+        version: sharedRecipe.version,
+      };
+
+      // Save both records
+      await Promise.all([
+        database.ref(`urlExtractions/${urlId}`).set(metadata),
+        database.ref(`urlRecipes/${urlId}`).set(recipeResult),
+        CacheService.delete(CACHE_KEYS.urlExtractionList(userId)),
+      ]);
+
+      return {
+        urlId,
+        recipe: sharedRecipe.recipe,
+        confidence: sharedRecipe.confidence,
+        isRecipeVideo: true,
+        fromCache: true,
+      };
+    }
+
+    // No cached recipe - process directly via Gemini
+    logger.info("url-recipe:sync-processing:start", {
+      urlId,
+      userId,
+      platform,
+    });
+
+    const result = await this.analyzeVideoUrl(sourceUrl, platform);
+    const processingDurationMs = Date.now() - startTime;
+
+    // Build full result
     const metadata: UrlExtractionMetadata = {
       urlId,
       userId,
       sourceUrl,
       normalizedUrl,
       platform,
-      analysisStatus: "queued",
+      analysisStatus: "completed",
+      videoTitle: result.recipe.title,
       submittedAt,
+      completedAt: new Date().toISOString(),
     };
 
-    // Save to RTDB
-    await database.ref(`urlExtractions/${urlId}`).set(metadata);
-
-    // Invalidate list cache
-    CacheService.delete(CACHE_KEYS.urlExtractionList(userId)).catch(() => {});
-
-    // Publish to Pub/Sub
-    await publishUrlExtractionJob(
+    const recipeResult: UrlRecipeResult = {
       urlId,
       userId,
-      normalizedUrl || sourceUrl,
-      platform
-    );
+      sourceUrl,
+      platform,
+      recipe: result.recipe,
+      confidence: result.confidence,
+      isRecipeVideo: result.isRecipeVideo,
+      modelUsed: GEMINI_MODELS.GEMINI_3_FLASH_PREVIEW,
+      processingDurationMs,
+      analyzedAt: new Date().toISOString(),
+      version: "1.0",
+    };
 
-    logger.info("url-recipe:submitted", {urlId, userId, platform});
+    // Save results and invalidate caches
+    await Promise.all([
+      database.ref(`urlExtractions/${urlId}`).set(metadata),
+      database.ref(`urlRecipes/${urlId}`).set(recipeResult),
+      CacheService.delete(CACHE_KEYS.urlExtractionList(userId)),
+    ]);
 
-    return {urlId};
+    // Save to shared storage for future deduplication (non-blocking)
+    if (result.isRecipeVideo && result.confidence >= 0.5) {
+      this.saveSharedRecipe(
+        normalizedUrl,
+        platform,
+        result.recipe,
+        result.confidence,
+        result.isRecipeVideo,
+        GEMINI_MODELS.GEMINI_3_FLASH_PREVIEW,
+        userId
+      ).catch((err) => {
+        logger.error("url-recipe:shared-save:failed", {
+          error: err instanceof Error ? err.message : String(err),
+        });
+      });
+    }
+
+    logger.info("url-recipe:sync-processing:completed", {
+      urlId,
+      userId,
+      processingDurationMs,
+      isRecipeVideo: result.isRecipeVideo,
+      ingredientCount: result.recipe.ingredients.length,
+      stepCount: result.recipe.steps.length,
+    });
+
+    return {
+      urlId,
+      recipe: result.recipe,
+      confidence: result.confidence,
+      isRecipeVideo: result.isRecipeVideo,
+      fromCache: false,
+    };
   }
 
   // ──────────────────────────────────────────
@@ -190,9 +426,7 @@ export class UrlRecipeService {
    * Process a URL extraction job.
    * Called by the Pub/Sub worker function.
    */
-  static async processExtraction(
-    message: UrlExtractionMessage
-  ): Promise<void> {
+  static async processExtraction(message: UrlExtractionMessage): Promise<void> {
     const {urlId, userId, sourceUrl, platform} = message;
     const startTime = Date.now();
 
@@ -201,6 +435,13 @@ export class UrlRecipeService {
     try {
       // Update status to analyzing
       await this.updateStatus(urlId, "analyzing");
+
+      // Get metadata to retrieve normalized URL
+      const metadataSnapshot = await database
+        .ref(`urlExtractions/${urlId}`)
+        .get();
+      const metadata = metadataSnapshot.val() as UrlExtractionMetadata;
+      const normalizedUrl = metadata.normalizedUrl || sourceUrl;
 
       // Call Gemini with video URL
       const result = await this.analyzeVideoUrl(sourceUrl, platform);
@@ -231,6 +472,19 @@ export class UrlRecipeService {
         }),
         CacheService.delete(CACHE_KEYS.urlExtractionList(userId)),
       ]);
+
+      // Save to shared storage for future deduplication (if it's a valid recipe)
+      if (result.isRecipeVideo && result.confidence >= 0.5) {
+        await this.saveSharedRecipe(
+          normalizedUrl,
+          platform,
+          result.recipe,
+          result.confidence,
+          result.isRecipeVideo,
+          GEMINI_MODELS.GEMINI_3_FLASH_PREVIEW,
+          userId
+        );
+      }
 
       logger.info("url-recipe:processing:completed", {
         urlId,
@@ -362,7 +616,8 @@ export class UrlRecipeService {
    * Prompt for YouTube videos (Gemini watches the actual video)
    */
   private static buildVideoRecipePrompt(): string {
-    return `You are an expert chef and recipe analyst. Watch this cooking video carefully and extract the complete recipe.
+    return `You are an expert chef and recipe analyst. Watch this cooking video
+carefully and extract the complete recipe.
 
 **YOUR TASK:**
 Analyze the entire video and extract a complete, reproducible recipe with precise measurements.
@@ -414,11 +669,22 @@ ${this.getRecipeResponseFormat()}`;
   private static getPlatformHint(platform: VideoPlatform): string {
     switch (platform) {
       case "instagram":
-        return "This is an Instagram post. The recipe may be in the caption, comments, or the post description. Look for ingredient lists and cooking steps in the text.";
+        return (
+          "This is an Instagram post. The recipe may be in the caption, " +
+          "comments, or the post description. Look for ingredient lists " +
+          "and cooking steps in the text."
+        );
       case "tiktok":
-        return "This is a TikTok post. The recipe may be in the video description, pinned comments, or creator bio link. Extract whatever recipe information is available on the page.";
+        return (
+          "This is a TikTok post. The recipe may be in the video " +
+          "description, pinned comments, or creator bio link. Extract " +
+          "whatever recipe information is available on the page."
+        );
       case "facebook":
-        return "This is a Facebook post. The recipe may be in the post text, comments, or linked content.";
+        return (
+          "This is a Facebook post. The recipe may be in the post text, " +
+          "comments, or linked content."
+        );
       default:
         return "Extract the recipe from whatever content is available on this page.";
     }
@@ -482,7 +748,8 @@ Return ONLY a valid JSON object (no markdown, no explanations):
       },
       {
         "stepNumber": 2,
-        "instruction": "Heat olive oil in a large skillet over medium-high heat. Sear chicken 5-6 minutes per side until golden.",
+        "instruction": "Heat olive oil in a large skillet over medium-high heat. " +
+          "Sear chicken 5-6 minutes per side until golden.",
         "durationMinutes": 12
       }
     ],
@@ -509,12 +776,17 @@ Return ONLY a valid JSON object (no markdown, no explanations):
 }
 
 **IMPORTANT EDGE CASES:**
-- If this is NOT a cooking/recipe page, set "isRecipeVideo" to false and provide a minimal recipe object with empty arrays and the title "Not a recipe"
+- If this is NOT a cooking/recipe page, set "isRecipeVideo" to false and
+  provide a minimal recipe object with empty arrays and the title "Not a recipe"
 - If the content shows multiple recipes, extract the PRIMARY/MAIN recipe only
 - If quantities are unclear, use your best culinary judgment and set confidence lower
-- "quantity" must be a number or null (for "to taste" items). Use null for "to taste" or "as needed"
-- "unit" should be standardized: "cups", "tbsp", "tsp", "oz", "lbs", "pieces", "cloves", "pinch", "to taste"
-- Difficulty: "easy" (under 30 min, basic techniques), "medium" (30-60 min or moderate skill), "hard" (60+ min or advanced techniques)
+- "quantity" must be a number or null (for "to taste" items).
+  Use null for "to taste" or "as needed"
+- "unit" should be standardized: "cups", "tbsp", "tsp", "oz", "lbs",
+  "pieces", "cloves", "pinch", "to taste"
+- Difficulty: "easy" (under 30 min, basic techniques),
+  "medium" (30-60 min or moderate skill),
+  "hard" (60+ min or advanced techniques)
 
 Be thorough and precise. A home cook should be able to reproduce this recipe from your extraction alone.`;
   }
@@ -530,9 +802,7 @@ Be thorough and precise. A home cook should be able to reproduce this recipe fro
     try {
       let cleanText = responseText.trim();
       if (cleanText.startsWith("```json")) {
-        cleanText = cleanText
-          .replace(/```json\n?/g, "")
-          .replace(/```\n?/g, "");
+        cleanText = cleanText.replace(/```json\n?/g, "").replace(/```\n?/g, "");
       } else if (cleanText.startsWith("```")) {
         cleanText = cleanText.replace(/```\n?/g, "");
       }
@@ -621,11 +891,14 @@ Be thorough and precise. A home cook should be able to reproduce this recipe fro
   }
 
   /**
-   * List user's URL extractions (newest first)
+   * List user's URL extractions with full recipe data (newest first)
    */
-  static async listExtractions(
-    userId: string
-  ): Promise<UrlExtractionMetadata[]> {
+  static async listExtractions(userId: string): Promise<
+    Array<{
+      metadata: UrlExtractionMetadata;
+      recipe?: UrlRecipeResult;
+    }>
+  > {
     const snapshot = await database
       .ref("urlExtractions")
       .orderByChild("userId")
@@ -645,7 +918,35 @@ Be thorough and precise. A home cook should be able to reproduce this recipe fro
         new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime()
     );
 
-    return extractions;
+    // Fetch recipe data for completed extractions
+    const result = await Promise.all(
+      extractions.map(async (metadata) => {
+        if (metadata.analysisStatus !== "completed") {
+          return {metadata};
+        }
+
+        // Try to get recipe from cache first
+        const cacheKey = CACHE_KEYS.urlRecipe(metadata.urlId);
+        let recipe = await CacheService.get<UrlRecipeResult>(cacheKey);
+
+        if (!recipe) {
+          const recipeSnapshot = await database
+            .ref(`urlRecipes/${metadata.urlId}`)
+            .get();
+          if (recipeSnapshot.exists()) {
+            recipe = recipeSnapshot.val() as UrlRecipeResult;
+            // Cache for future reads
+            CacheService.set(cacheKey, recipe, CACHE_TTL.ANALYSIS_RESULT).catch(
+              () => {}
+            );
+          }
+        }
+
+        return {metadata, recipe: recipe ?? undefined};
+      })
+    );
+
+    return result;
   }
 
   // ──────────────────────────────────────────

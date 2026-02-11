@@ -167,6 +167,24 @@ export interface UrlRecipeResult {
   version: string;
 }
 
+/**
+ * Shared recipe data stored in RTDB at `sharedUrlRecipes/{urlHash}`
+ * Used for deduplication across all users
+ */
+export interface SharedUrlRecipe {
+  urlHash: string;
+  normalizedUrl: string;
+  platform: VideoPlatform;
+  recipe: ExtractedRecipe;
+  confidence: number;
+  isRecipeVideo: boolean;
+  modelUsed: string;
+  firstExtractedAt: string;
+  firstExtractedBy: string;
+  extractionCount: number;
+  version: string;
+}
+
 // ============================================================================
 // API Request/Response Types
 // ============================================================================
@@ -180,22 +198,54 @@ export interface ExtractRecipeFromUrlRequest {
 }
 
 /**
- * Response after submitting a URL for extraction
+ * Response after submitting a URL for extraction.
+ * Returns the full extracted recipe data (processed synchronously).
  */
 export interface ExtractRecipeFromUrlResponse {
   message: string;
   urlId: string;
   sourceUrl: string;
   platform: VideoPlatform;
-  status: "queued";
+  status: "completed";
   creditsUsed: number;
+  /** Whether this URL was previously processed (dedup cache hit) */
+  fromCache: boolean;
+  /** Whether the content was identified as a recipe */
+  isRecipeVideo: boolean;
+  /** Confidence score 0-1 for the extraction quality */
+  confidence: number;
+  /** The fully extracted recipe with ingredients, steps, timings, etc. */
+  recipe: ExtractedRecipe;
 }
 
 /**
- * List response for user's URL extractions
+ * List response for user's URL extractions with full recipe data
  */
 export interface UrlExtractionListResponse {
-  extractions: UrlExtractionMetadata[];
+  extractions: Array<{
+    metadata: UrlExtractionMetadata;
+    recipe?: UrlRecipeResult;
+  }>;
+}
+
+/**
+ * Combined response for user's images and URL extractions
+ */
+export interface CombinedAssetsResponse {
+  images: Array<{
+    imageId: string;
+    uploadedAt: string;
+    fileName: string;
+    /** Cloud Storage path (e.g., users/{uid}/images/{imageId}.jpg) */
+    storagePath: string;
+    /** Signed URL for image display (valid for 7 days) */
+    thumbnailUrl: string;
+    analysisStatus: string;
+  }>;
+  urlExtractions: Array<{
+    metadata: UrlExtractionMetadata;
+    recipe?: UrlRecipeResult;
+  }>;
 }
 
 // ============================================================================

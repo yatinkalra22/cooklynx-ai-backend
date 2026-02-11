@@ -1,7 +1,4 @@
-import {
-  geminiModel,
-  geminiModerationModel,
-} from "../config/firebase.config";
+import {geminiModel, geminiModerationModel} from "../config/firebase.config";
 import {StorageService} from "./storage.service";
 import {FoodAnalysis} from "../types/api.types";
 import * as logger from "firebase-functions/logger";
@@ -189,7 +186,9 @@ Be STRICT about safety. When in doubt, mark as unsafe. CSAM detection must have 
   private static buildFoodAnalysisPrompt(
     includeRecommendations = true
   ): string {
-    const basePrompt = `You are an expert culinary assistant and nutritionist. Analyze this image to identify food items, ingredients, and products.`;
+    const basePrompt =
+      "You are an expert culinary assistant and nutritionist. " +
+      "Analyze this image to identify food items, ingredients, and products.";
 
     const analysisInstructions = `
 For each item identified, provide:
@@ -302,7 +301,8 @@ Be precise and helpful. Return ONLY valid JSON.`;
           parsed.recommendations.analyzedAt = new Date().toISOString();
         }
         logger.info("Successfully parsed recommendations from AI response", {
-          recommendationCount: parsed.recommendations.recommendations?.length || 0,
+          recommendationCount:
+            parsed.recommendations.recommendations?.length || 0,
         });
       }
 

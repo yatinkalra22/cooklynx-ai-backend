@@ -289,7 +289,7 @@ export class ImageController extends Controller {
         database.ref(`images/${imageId}`).update({
           analysisStatus: "completed",
           analyzedAt: new Date().toISOString(),
-          // Food analysis doesn't have an overall score in the same way, 
+          // Food analysis doesn't have an overall score in the same way,
           // but we can use the number of items or just 100 if successful
           overallScore: analysis.items.length > 0 ? 100 : 0,
         }),
