@@ -24,7 +24,9 @@ import {
   UrlExtractionStatusResponse,
   UrlExtractionListResponse,
   CombinedAssetsResponse,
+  VideoPlatform,
 } from "../types/recipe-url.types";
+import {GEMINI_MODELS} from "../types/gemini.types";
 import {ErrorResponse} from "../types/api.types";
 import {AuthUser} from "../middleware/tsoa-auth.middleware";
 import * as logger from "firebase-functions/logger";
@@ -83,43 +85,119 @@ export class RecipeUrlController extends Controller {
     }
 
     try {
-      // Process synchronously - calls Gemini, saves to DB, returns full recipe
-      const result = await UrlRecipeService.extractRecipeSync(
-        user.uid,
-        body.url,
-        validation.platform,
+      const {v4: uuidv4} = await import("uuid");
+      const urlId = `url_${uuidv4()}`;
+      const submittedAt = new Date().toISOString();
+
+      // Check dedup cache first — if hit, return completed immediately (fast, no AI call)
+      const sharedRecipe = await UrlRecipeService.checkSharedRecipe(
         validation.normalizedUrl
       );
 
-      logger.info("recipe-url:extract:success", {
+      if (sharedRecipe && sharedRecipe.isRecipeVideo) {
+        // Cache hit — save records and return completed instantly
+        await Promise.all([
+          database.ref(`urlExtractions/${urlId}`).set({
+            urlId,
+            userId: user.uid,
+            sourceUrl: body.url,
+            normalizedUrl: validation.normalizedUrl,
+            platform: validation.platform,
+            analysisStatus: "completed",
+            videoTitle: sharedRecipe.recipe.title,
+            submittedAt,
+            completedAt: submittedAt,
+          }),
+          database.ref(`urlRecipes/${urlId}`).set({
+            urlId,
+            userId: user.uid,
+            sourceUrl: body.url,
+            platform: validation.platform,
+            recipe: sharedRecipe.recipe,
+            confidence: sharedRecipe.confidence,
+            isRecipeVideo: sharedRecipe.isRecipeVideo,
+            modelUsed: sharedRecipe.modelUsed,
+            processingDurationMs: 0,
+            analyzedAt: submittedAt,
+            version: sharedRecipe.version,
+          }),
+          CacheService.delete(CACHE_KEYS.urlExtractionList(user.uid)),
+        ]);
+
+        logger.info("recipe-url:extract:cache-hit", {
+          userId: user.uid,
+          urlId,
+          platform: validation.platform,
+        });
+
+        this.setStatus(201);
+        return {
+          message: "Recipe found in cache. Instant results.",
+          urlId,
+          sourceUrl: body.url,
+          normalizedUrl: validation.normalizedUrl,
+          platform: validation.platform,
+          status: "completed",
+          creditsUsed: URL_EXTRACTION_CREDIT_COST,
+          creditsRemaining,
+          submittedAt,
+          fromCache: true,
+          isRecipeVideo: sharedRecipe.isRecipeVideo,
+          confidence: sharedRecipe.confidence,
+          recipe: sharedRecipe.recipe,
+        };
+      }
+
+      // No cache hit — create metadata with "pending" and process async
+      await database.ref(`urlExtractions/${urlId}`).set({
+        urlId,
         userId: user.uid,
-        urlId: result.urlId,
+        sourceUrl: body.url,
+        normalizedUrl: validation.normalizedUrl,
         platform: validation.platform,
-        fromCache: result.fromCache,
-        isRecipeVideo: result.isRecipeVideo,
-        ingredientCount: result.recipe.ingredients.length,
+        analysisStatus: "pending",
+        submittedAt,
+      });
+
+      // Invalidate list caches
+      CacheService.delete(CACHE_KEYS.urlExtractionList(user.uid)).catch(
+        () => {}
+      );
+      CacheService.delete(CACHE_KEYS.assetList(user.uid)).catch(() => {});
+
+      // Start async processing (don't wait — same pattern as image upload)
+      this.extractRecipeAsync(
+        user.uid,
+        urlId,
+        body.url,
+        validation.platform,
+        validation.normalizedUrl
+      ).catch((error) => {
+        logger.error("recipe-url:async-extract:unhandled", {
+          urlId,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      });
+
+      logger.info("recipe-url:extract:submitted", {
+        userId: user.uid,
+        urlId,
+        platform: validation.platform,
       });
 
       this.setStatus(201);
       return {
-        message: result.fromCache
-          ? "Recipe found in cache. Instant results."
-          : "Recipe extracted successfully.",
-        urlId: result.urlId,
+        message: "URL submitted for recipe extraction. Poll for results.",
+        urlId,
         sourceUrl: body.url,
         normalizedUrl: validation.normalizedUrl,
         platform: validation.platform,
-        status: "completed",
+        status: "pending",
         creditsUsed: URL_EXTRACTION_CREDIT_COST,
         creditsRemaining,
-        submittedAt: result.submittedAt,
-        fromCache: result.fromCache,
-        isRecipeVideo: result.isRecipeVideo,
-        confidence: result.confidence,
-        recipe: result.recipe,
+        submittedAt,
       };
     } catch (error) {
-      // Check if this is a URL access denied error (Instagram, TikTok, Facebook restrictions)
       const errorMessage =
         error instanceof Error ? error.message : String(error);
       const isAccessDenied = errorMessage
@@ -145,6 +223,95 @@ export class RecipeUrlController extends Controller {
         error: "Internal Server Error",
         message: "Failed to extract recipe from URL",
       };
+    }
+  }
+
+  /**
+   * Async recipe extraction job (runs in background).
+   * Same pattern as image controller's analyzeImageAsync.
+   */
+  private async extractRecipeAsync(
+    userId: string,
+    urlId: string,
+    sourceUrl: string,
+    platform: VideoPlatform,
+    normalizedUrl: string
+  ): Promise<void> {
+    const startTime = Date.now();
+
+    try {
+      // Update status to analyzing
+      await database
+        .ref(`urlExtractions/${urlId}`)
+        .update({analysisStatus: "analyzing"});
+
+      // Call Gemini AI
+      const result = await UrlRecipeService.analyzeVideoUrl(
+        sourceUrl,
+        platform
+      );
+      const processingDurationMs = Date.now() - startTime;
+
+      // Build recipe result
+      const recipeResult = {
+        urlId,
+        userId,
+        sourceUrl,
+        platform,
+        recipe: result.recipe,
+        confidence: result.confidence,
+        isRecipeVideo: result.isRecipeVideo,
+        modelUsed: GEMINI_MODELS.GEMINI_3_FLASH_PREVIEW,
+        processingDurationMs,
+        analyzedAt: new Date().toISOString(),
+        version: "1.0",
+      };
+
+      // Save results and update status (batch in parallel)
+      await Promise.all([
+        database.ref(`urlRecipes/${urlId}`).set(recipeResult),
+        database.ref(`urlExtractions/${urlId}`).update({
+          analysisStatus: "completed",
+          completedAt: new Date().toISOString(),
+          videoTitle: result.recipe.title,
+        }),
+        CacheService.delete(CACHE_KEYS.urlExtractionList(userId)),
+      ]);
+
+      // Save to shared cache for future dedup (non-blocking)
+      if (result.isRecipeVideo && result.confidence >= 0.5) {
+        UrlRecipeService.saveSharedRecipe(
+          normalizedUrl,
+          platform,
+          result.recipe,
+          result.confidence,
+          result.isRecipeVideo,
+          GEMINI_MODELS.GEMINI_3_FLASH_PREVIEW,
+          userId
+        ).catch(() => {});
+      }
+
+      logger.info("recipe-url:async-extract:completed", {
+        urlId,
+        userId,
+        processingDurationMs,
+        isRecipeVideo: result.isRecipeVideo,
+        ingredientCount: result.recipe.ingredients.length,
+      });
+    } catch (error) {
+      logger.error("recipe-url:async-extract:failed", {
+        urlId,
+        userId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+
+      await database.ref(`urlExtractions/${urlId}`).update({
+        analysisStatus: "failed",
+        error:
+          error instanceof Error
+            ? error.message
+            : "Recipe extraction failed. Please try again.",
+      });
     }
   }
 

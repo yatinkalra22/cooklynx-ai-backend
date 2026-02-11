@@ -154,7 +154,7 @@ export class UrlRecipeService {
    * Check if this URL has been processed before (across all users).
    * Returns shared recipe data if found.
    */
-  private static async checkSharedRecipe(
+  public static async checkSharedRecipe(
     normalizedUrl: string
   ): Promise<SharedUrlRecipe | null> {
     const urlHash = this.generateUrlHash(normalizedUrl);
@@ -204,7 +204,7 @@ export class UrlRecipeService {
   /**
    * Save recipe to shared storage for future deduplication
    */
-  private static async saveSharedRecipe(
+  public static async saveSharedRecipe(
     normalizedUrl: string,
     platform: VideoPlatform,
     recipe: ExtractedRecipe,
@@ -524,8 +524,9 @@ export class UrlRecipeService {
    * Route to the correct analysis method based on platform.
    * - YouTube: Native Gemini fileData (watches the actual video)
    * - Everything else: Gemini URL Context tool (reads the webpage content)
+   * Public so the controller can call it for async processing.
    */
-  static async analyzeVideoUrl(
+  public static async analyzeVideoUrl(
     url: string,
     platform: VideoPlatform
   ): Promise<{
