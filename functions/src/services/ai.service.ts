@@ -230,8 +230,7 @@ Be precise and helpful. Return ONLY valid JSON.`;
     }
 
     // Determine number of recommendations and personalization
-    const hasPreferences =
-      userPreferences && userPreferences.cuisines.length > 0;
+    const hasPreferences = userPreferences?.cuisines?.length;
     const totalRecommendations = hasPreferences ? 5 : 3;
     const personalizedCount = hasPreferences ? 3 : 0;
     const randomCount = hasPreferences ? 2 : 3;
