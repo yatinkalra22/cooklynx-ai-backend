@@ -45,6 +45,51 @@ export const PRO_MAX_CREDIT_LIMIT = 500;
 export const IMAGE_CREDIT_COST = 1;
 
 // ============================================================================
+// Food Preferences
+// ============================================================================
+
+export const CUISINE_DESCRIPTIONS = {
+  Indian: {description: "Spicy curries, tandoori, biryani", emoji: "🍛"},
+  Italian: {description: "Pasta, pizza, risotto", emoji: "🍝"},
+  Mexican: {description: "Tacos, burritos, enchiladas", emoji: "🌮"},
+  Chinese: {description: "Stir-fry, dumplings, fried rice", emoji: "🥡"},
+  Japanese: {description: "Sushi, ramen, teriyaki", emoji: "🍱"},
+  Thai: {description: "Pad Thai, curries, spring rolls", emoji: "🍜"},
+  Mediterranean: {
+    description: "Greek, Turkish, Lebanese flavors",
+    emoji: "🫒",
+  },
+  French: {description: "Elegant cuisine, sauces, pastries", emoji: "🥐"},
+  Korean: {description: "BBQ, kimchi, bibimbap", emoji: "🍲"},
+  Vietnamese: {description: "Pho, banh mi, fresh rolls", emoji: "🥢"},
+  "Middle Eastern": {
+    description: "Hummus, falafel, kebabs",
+    emoji: "🧆",
+  },
+  American: {description: "Burgers, BBQ, comfort food", emoji: "🍔"},
+  Greek: {description: "Gyros, moussaka, souvlaki", emoji: "🥙"},
+  Spanish: {description: "Paella, tapas, gazpacho", emoji: "🥘"},
+  Caribbean: {description: "Jerk chicken, plantains, rice", emoji: "🏝️"},
+  African: {description: "Diverse regional cuisines", emoji: "🌍"},
+  Brazilian: {description: "Churrasco, feijoada, moqueca", emoji: "🇧🇷"},
+  Fusion: {description: "Creative modern combinations", emoji: "✨"},
+};
+
+export const DIETARY_DESCRIPTIONS = {
+  Vegetarian: {description: "No meat or fish", emoji: "🥗"},
+  Vegan: {description: "No animal products", emoji: "🌱"},
+  Pescatarian: {description: "Fish but no meat", emoji: "🐟"},
+  "Gluten-Free": {description: "No gluten/wheat", emoji: "🌾"},
+  "Dairy-Free": {description: "No milk products", emoji: "🥛"},
+  Keto: {description: "Low-carb, high-fat", emoji: "🥓"},
+  Paleo: {description: "Whole foods, no processed", emoji: "🥩"},
+  "Low-Carb": {description: "Reduced carbohydrates", emoji: "🥦"},
+  Halal: {description: "Islamic dietary laws", emoji: "☪️"},
+  Kosher: {description: "Jewish dietary laws", emoji: "✡️"},
+  None: {description: "No dietary restrictions", emoji: "🍽️"},
+};
+
+// ============================================================================
 // Video Processing
 // ============================================================================
 
