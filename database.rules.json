@@ -16,6 +16,16 @@
       "$userId": {
         ".indexOn": [".value"]
       }
+    },
+    "urlExtractions": {
+      ".indexOn": ["userId"]
+    },
+    "urlRecipes": {
+      ".indexOn": ["userId"]
+    },
+    "sharedUrlRecipes": {
+      ".read": "auth != null",
+      ".indexOn": ["normalizedUrl"]
     }
   }
 }

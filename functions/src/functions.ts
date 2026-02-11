@@ -3,8 +3,10 @@ import {onMessagePublished} from "firebase-functions/v2/pubsub";
 import {defineSecret} from "firebase-functions/params";
 import {app} from "./index";
 import {VideoService} from "./services/video.service";
+import {UrlRecipeService} from "./services/url-recipe.service";
 import {PUBSUB_TOPICS} from "./config/pubsub.config";
 import {VideoAnalysisMessage} from "./types/video.types";
+import {UrlExtractionMessage} from "./types/recipe-url.types";
 import * as logger from "firebase-functions/logger";
 
 // Define secrets (sensitive data only)
@@ -60,6 +62,47 @@ export const videoAnalysisWorker = onMessagePublished(
 
       // Do not re-throw to prevent infinite Pub/Sub retries
       // We want to stop processing if it fails
+    }
+  }
+);
+
+/**
+ * Pub/Sub worker function for URL recipe extraction
+ * Processes URL extraction jobs from the url-recipe-extraction-queue topic
+ */
+export const urlRecipeExtractionWorker = onMessagePublished(
+  {
+    topic: PUBSUB_TOPICS.URL_RECIPE_EXTRACTION_QUEUE,
+    region: REGION,
+    memory: "1GiB",
+    timeoutSeconds: 300, // 5 minutes for Gemini video analysis
+    maxInstances: 10,
+  },
+  async (event) => {
+    const message = event.data.message;
+
+    try {
+      const data: UrlExtractionMessage = message.json;
+
+      logger.info("urlRecipeExtractionWorker:received", {
+        urlId: data.urlId,
+        userId: data.userId,
+        platform: data.platform,
+      });
+
+      await UrlRecipeService.processExtraction(data);
+
+      logger.info("urlRecipeExtractionWorker:completed", {
+        urlId: data.urlId,
+        userId: data.userId,
+      });
+    } catch (error) {
+      logger.error("urlRecipeExtractionWorker:failed", {
+        error: error instanceof Error ? error.message : String(error),
+        messageId: message.messageId,
+      });
+
+      // Do not re-throw to prevent infinite Pub/Sub retries
     }
   }
 );

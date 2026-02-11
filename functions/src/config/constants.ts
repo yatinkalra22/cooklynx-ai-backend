@@ -83,6 +83,24 @@ export const VIDEO_FRAME_DEDUP_THRESHOLD = 1;
 export const VIDEO_REPRESENTATIVE_FRAMES = [0.1, 0.5, 0.9];
 
 // ============================================================================
+// URL Recipe Extraction
+// ============================================================================
+
+// Credits consumed per URL recipe extraction
+export const URL_EXTRACTION_CREDIT_COST = 1;
+
+// Maximum URL length accepted
+export const URL_MAX_LENGTH = 2048;
+
+// Supported YouTube URL patterns
+export const YOUTUBE_URL_PATTERNS = [
+  /^https?:\/\/(www\.)?youtube\.com\/watch\?v=[\w-]+/,
+  /^https?:\/\/youtu\.be\/[\w-]+/,
+  /^https?:\/\/(www\.)?youtube\.com\/shorts\/[\w-]+/,
+  /^https?:\/\/m\.youtube\.com\/watch\?v=[\w-]+/,
+];
+
+// ============================================================================
 // Firebase
 // ============================================================================
 
