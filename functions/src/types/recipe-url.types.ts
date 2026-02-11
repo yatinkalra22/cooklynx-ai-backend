@@ -208,7 +208,7 @@ export interface ExtractRecipeFromUrlResponse {
   /** Normalized/canonical URL for the platform */
   normalizedUrl: string;
   platform: VideoPlatform;
-  status: "completed" | "queued";
+  status: "completed" | "pending";
   creditsUsed: number;
   /** Remaining credits after this operation */
   creditsRemaining: number;
