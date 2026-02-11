@@ -33,6 +33,14 @@
       {
         "name": "Recipes",
         "description": "Recipe extraction from video URLs"
+      },
+      {
+        "name": "Subscription",
+        "description": "Subscription management and credit usage"
+      },
+      {
+        "name": "Webhooks",
+        "description": "Third-party webhook handlers"
       }
     ],
     "spec": {

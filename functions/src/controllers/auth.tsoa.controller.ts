@@ -42,6 +42,7 @@ import {
   COOLDOWN_MS,
   FIREBASE_ERROR_CODES,
   HTTP_STATUS,
+  FREE_CREDIT_LIMIT,
 } from "../config/constants";
 import * as logger from "firebase-functions/logger";
 import {UserService} from "../services/user.service";
@@ -133,6 +134,8 @@ export class AuthController extends Controller {
         photoURL: null,
         emailVerified: userRecord.emailVerified,
         ...(userRecord.emailVerified && {verifiedAt: now}),
+        credit: 0,
+        creditLimit: FREE_CREDIT_LIMIT,
         metadata: {
           signupMethod: "email",
         },
@@ -141,6 +144,19 @@ export class AuthController extends Controller {
           count: 0,
           lastAttemptAt: null,
           resetAt: null,
+        },
+        subscription: {
+          plan: "free",
+          status: "active",
+          entitlementId: null,
+          productId: null,
+          store: null,
+          expiresAt: null,
+          periodStartAt: null,
+          creditLimit: FREE_CREDIT_LIMIT,
+          creditsUsedThisPeriod: 0,
+          lastSyncedAt: now,
+          originalPurchaseDate: null,
         },
       });
 
@@ -367,15 +383,31 @@ export class AuthController extends Controller {
           });
 
           // Create user profile in database
+          const googleCreatedAt = new Date().toISOString();
           await database.ref(`users/${userRecord.uid}`).set({
             email,
             displayName,
             photoURL,
-            createdAt: new Date().toISOString(),
+            createdAt: googleCreatedAt,
             emailVerified: true,
+            credit: 0,
+            creditLimit: FREE_CREDIT_LIMIT,
             metadata: {
               signupMethod: "google",
               googleId,
+            },
+            subscription: {
+              plan: "free",
+              status: "active",
+              entitlementId: null,
+              productId: null,
+              store: null,
+              expiresAt: null,
+              periodStartAt: null,
+              creditLimit: FREE_CREDIT_LIMIT,
+              creditsUsedThisPeriod: 0,
+              lastSyncedAt: googleCreatedAt,
+              originalPurchaseDate: null,
             },
           });
         } else {
@@ -552,8 +584,8 @@ export class AuthController extends Controller {
       const profileSnapshot = await database.ref(`users/${user.uid}`).get();
       const profile = profileSnapshot.val();
 
-      // Get beta credits
-      const {credit, creditLimit} = await UserService.getBetaCredits(user.uid);
+      // Get credits
+      const {credit, creditLimit} = await UserService.getCredits(user.uid);
 
       return {
         user: {
