@@ -279,6 +279,7 @@ export class UrlRecipeService {
     confidence: number;
     isRecipeVideo: boolean;
     fromCache: boolean;
+    submittedAt: string;
   }> {
     const {v4: uuidv4} = await import("uuid");
     const urlId = `url_${uuidv4()}`;
@@ -336,6 +337,7 @@ export class UrlRecipeService {
         confidence: sharedRecipe.confidence,
         isRecipeVideo: true,
         fromCache: true,
+        submittedAt,
       };
     }
 
@@ -415,6 +417,7 @@ export class UrlRecipeService {
       confidence: result.confidence,
       isRecipeVideo: result.isRecipeVideo,
       fromCache: false,
+      submittedAt,
     };
   }
 
@@ -605,6 +608,36 @@ export class UrlRecipeService {
       throw new Error("Gemini returned an empty response for this URL");
     }
 
+    // Check if Gemini couldn't access the URL (common with Instagram, TikTok, Facebook)
+    const lowerText = text.toLowerCase();
+    const accessDeniedIndicators = [
+      "could not be accessed",
+      "could not access",
+      "unable to access",
+      "cannot access",
+      "restrictions on the source",
+      "technical limitations in browsing",
+      "failed to fetch",
+      "failed to retrieve",
+      "access denied",
+      "blocked from accessing",
+    ];
+
+    const isAccessDenied = accessDeniedIndicators.some((indicator) =>
+      lowerText.includes(indicator)
+    );
+
+    if (isAccessDenied) {
+      logger.warn("url-recipe:url-access-denied", {
+        url,
+        platform,
+        response: text,
+      });
+      throw new Error(
+        `Unable to access ${platform} content. ${this.getPlatformAccessError(platform)}`
+      );
+    }
+
     return this.parseRecipeResponse(text);
   }
 
@@ -687,6 +720,38 @@ ${this.getRecipeResponseFormat()}`;
         );
       default:
         return "Extract the recipe from whatever content is available on this page.";
+    }
+  }
+
+  /**
+   * Platform-specific error messages when URL access is denied
+   */
+  private static getPlatformAccessError(platform: VideoPlatform): string {
+    switch (platform) {
+      case "instagram":
+        return (
+          "Instagram restricts automated access to their content. " +
+          "This is a known limitation. We recommend using YouTube URLs for recipe extraction, " +
+          "or you can manually enter the recipe details."
+        );
+      case "tiktok":
+        return (
+          "TikTok restricts automated access to their content. " +
+          "This is a known limitation. We recommend using YouTube URLs for recipe extraction, " +
+          "or you can manually enter the recipe details."
+        );
+      case "facebook":
+        return (
+          "Facebook restricts automated access to their content. " +
+          "This is a known limitation. We recommend using YouTube URLs for recipe extraction, " +
+          "or you can manually enter the recipe details."
+        );
+      default:
+        return (
+          "This website restricts automated access to their content. " +
+          "We recommend using YouTube URLs for recipe extraction, " +
+          "or you can manually enter the recipe details."
+        );
     }
   }
 

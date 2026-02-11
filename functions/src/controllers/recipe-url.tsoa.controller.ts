@@ -106,20 +106,37 @@ export class RecipeUrlController extends Controller {
           : "Recipe extracted successfully.",
         urlId: result.urlId,
         sourceUrl: body.url,
+        normalizedUrl: validation.normalizedUrl,
         platform: validation.platform,
         status: "completed",
         creditsUsed: URL_EXTRACTION_CREDIT_COST,
+        submittedAt: result.submittedAt,
         fromCache: result.fromCache,
         isRecipeVideo: result.isRecipeVideo,
         confidence: result.confidence,
         recipe: result.recipe,
       };
     } catch (error) {
+      // Check if this is a URL access denied error (Instagram, TikTok, Facebook restrictions)
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      const isAccessDenied = errorMessage
+        .toLowerCase()
+        .includes("unable to access");
+
+      if (isAccessDenied) {
+        this.setStatus(403);
+        throw {
+          error: "Access Denied",
+          message: errorMessage,
+        };
+      }
+
       if ((error as {error?: string}).error) throw error;
 
       logger.error("recipe-url:extract:failed", {
         userId: user.uid,
-        error: error instanceof Error ? error.message : String(error),
+        error: errorMessage,
       });
       this.setStatus(500);
       throw {
