@@ -52,7 +52,7 @@ export class VideoController extends Controller {
 
     // Reserve credits upfront (atomic check + deduct)
     try {
-      await UserService.reserveBetaCredits(
+      await UserService.reserveCredits(
         user.uid,
         VIDEO_CREDIT_COST,
         "video_analysis",
@@ -60,7 +60,7 @@ export class VideoController extends Controller {
       );
     } catch (error: unknown) {
       const err = error as {error?: string};
-      if (err.error === "Beta Limit Reached") {
+      if (err.error === "Credit Limit Reached") {
         this.setStatus(403);
       }
       throw error;

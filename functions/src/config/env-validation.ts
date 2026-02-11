@@ -43,6 +43,8 @@ export function validateOptionalEnvironment(): void {
     SENTRY_DSN: "Error tracking will be disabled",
     APP_URL: "Using default Firebase hosting URL",
     REDIS_ENABLED: "Caching will use database only",
+    REVENUECAT_SECRET_API_KEY: "RevenueCat subscription sync will be disabled",
+    REVENUECAT_WEBHOOK_SECRET: "Webhook authorization will be disabled",
   };
 
   for (const [key, warning] of Object.entries(optional)) {

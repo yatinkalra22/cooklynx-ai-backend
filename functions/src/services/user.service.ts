@@ -1,5 +1,5 @@
 import {database} from "../config/firebase.config";
-import {MAX_CONTENT_VIOLATIONS, BETA_USAGE_LIMIT} from "../config/constants";
+import {MAX_CONTENT_VIOLATIONS, FREE_CREDIT_LIMIT} from "../config/constants";
 import {CreditTransactionType, CreditLedgerEntry} from "../types/api.types";
 
 export type UserPhotoCounterDeltas = {
@@ -99,17 +99,16 @@ export class UserService {
   /**
    * Get user's credit information.
    * Returns both credit (consumed) and creditLimit (max allowed).
-   * Initializes with defaults if not set.
+   * Reads creditLimit from subscription node, falls back to FREE_CREDIT_LIMIT.
    */
-  static async getBetaCredits(
+  static async getCredits(
     userId: string
   ): Promise<{credit: number; creditLimit: number}> {
     const userRef = database.ref(`users/${userId}`);
     const snapshot = await userRef.get();
 
     let credit = 0;
-    let creditLimit = BETA_USAGE_LIMIT;
-    let needsUpdate = false;
+    let creditLimit = FREE_CREDIT_LIMIT;
 
     if (snapshot.exists()) {
       const userData = snapshot.val();
@@ -117,53 +116,36 @@ export class UserService {
       creditLimit =
         typeof userData.creditLimit === "number"
           ? userData.creditLimit
-          : BETA_USAGE_LIMIT;
-
-      // If existing user is missing credit or creditLimit fields, add them
-      if (
-        typeof userData.credit !== "number" ||
-        typeof userData.creditLimit !== "number"
-      ) {
-        needsUpdate = true;
-      }
-    } else {
-      // Initialize with default values for new users
-      needsUpdate = true;
-    }
-
-    if (needsUpdate) {
-      await userRef.update({
-        credit,
-        creditLimit,
-      });
+          : FREE_CREDIT_LIMIT;
     }
 
     return {credit, creditLimit};
   }
 
   /**
-   * Atomically reserve beta credits for an operation.
+   * Atomically reserve credits for an operation.
    * Checks availability AND deducts in a single RTDB transaction,
    * eliminating the TOCTOU race condition.
+   * Credit limit is read from user's subscription (set by RevenueCat sync).
    * Returns remaining credits after reservation.
    * @param userId - The user's ID
    * @param amount - Number of credits to reserve
    * @param type - The type of credit transaction
    * @param resourceId - Identifier for the resource being charged
    */
-  static async reserveBetaCredits(
+  static async reserveCredits(
     userId: string,
     amount: number,
     type: CreditTransactionType,
     resourceId: string
   ): Promise<number> {
-    // Read creditLimit first (safe — admin-only value, not subject to races)
+    // Read creditLimit first (safe — set by subscription sync, not subject to races)
     const limitSnapshot = await database
       .ref(`users/${userId}/creditLimit`)
       .get();
     const creditLimit = limitSnapshot.exists()
       ? (limitSnapshot.val() as number)
-      : BETA_USAGE_LIMIT;
+      : FREE_CREDIT_LIMIT;
 
     // Atomic transaction: check + deduct in one step
     const result = await database
@@ -186,8 +168,8 @@ export class UserService {
         typeof result.snapshot.val() === "number" ? result.snapshot.val() : 0;
       const remaining = Math.max(0, creditLimit - currentCredit);
       throw {
-        error: "Beta Limit Reached",
-        message: `Not enough credits. Required: ${amount}, Available: ${remaining}. Try with a different account.`,
+        error: "Credit Limit Reached",
+        message: `Not enough credits. Required: ${amount}, Available: ${remaining}. Upgrade your plan for more credits.`,
       };
     }
 

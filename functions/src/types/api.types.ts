@@ -43,6 +43,14 @@ export interface User {
   credit?: number;
   /** Maximum credits allowed for this user */
   creditLimit?: number;
+  /** Subscription information */
+  subscription?: {
+    plan: string;
+    status: string;
+    creditLimit: number;
+    creditsUsedThisPeriod: number;
+    expiresAt: string | null;
+  };
 }
 
 export interface UserMetadata {
@@ -195,7 +203,9 @@ export type CreditTransactionType =
   | "image_fix_refund"
   | "video_analysis_refund"
   | "video_fix_refund"
-  | "url_recipe_extraction_refund";
+  | "url_recipe_extraction_refund"
+  | "subscription_credit_reset"
+  | "subscription_upgrade_bonus";
 
 export interface CreditLedgerEntry {
   type: CreditTransactionType;

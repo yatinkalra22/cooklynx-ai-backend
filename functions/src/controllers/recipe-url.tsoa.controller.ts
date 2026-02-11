@@ -66,8 +66,9 @@ export class RecipeUrlController extends Controller {
     }
 
     // Reserve credits atomically
+    let creditsRemaining = 0;
     try {
-      await UserService.reserveBetaCredits(
+      creditsRemaining = await UserService.reserveCredits(
         user.uid,
         URL_EXTRACTION_CREDIT_COST,
         "url_recipe_extraction",
@@ -75,7 +76,7 @@ export class RecipeUrlController extends Controller {
       );
     } catch (error: unknown) {
       const err = error as {error?: string};
-      if (err.error === "Beta Limit Reached") {
+      if (err.error === "Credit Limit Reached") {
         this.setStatus(403);
       }
       throw error;
@@ -110,6 +111,7 @@ export class RecipeUrlController extends Controller {
         platform: validation.platform,
         status: "completed",
         creditsUsed: URL_EXTRACTION_CREDIT_COST,
+        creditsRemaining,
         submittedAt: result.submittedAt,
         fromCache: result.fromCache,
         isRecipeVideo: result.isRecipeVideo,

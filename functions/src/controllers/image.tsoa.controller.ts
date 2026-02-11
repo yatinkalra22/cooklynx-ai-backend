@@ -58,7 +58,7 @@ export class ImageController extends Controller {
 
     // Reserve credits upfront (atomic check + deduct)
     try {
-      await UserService.reserveBetaCredits(
+      await UserService.reserveCredits(
         user.uid,
         IMAGE_CREDIT_COST,
         "image_analysis",
@@ -66,7 +66,7 @@ export class ImageController extends Controller {
       );
     } catch (error: unknown) {
       const err = error as {error?: string};
-      if (err.error === "Beta Limit Reached") {
+      if (err.error === "Credit Limit Reached") {
         this.setStatus(403);
       }
       throw error;

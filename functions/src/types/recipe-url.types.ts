@@ -210,6 +210,8 @@ export interface ExtractRecipeFromUrlResponse {
   platform: VideoPlatform;
   status: "completed" | "queued";
   creditsUsed: number;
+  /** Remaining credits after this operation */
+  creditsRemaining: number;
   /** Timestamp when the URL was submitted */
   submittedAt: string;
   /** Whether this URL was previously processed (dedup cache hit) */

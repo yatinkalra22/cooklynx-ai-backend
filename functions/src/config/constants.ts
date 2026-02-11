@@ -31,8 +31,11 @@ export const COOLDOWN_MS = COOLDOWN_HOURS * 60 * 60 * 1000;
 // Content moderation - max violations before account is blocked
 export const MAX_CONTENT_VIOLATIONS = 3;
 
-// Beta limits - max uploads per account during hackathon
-export const BETA_USAGE_LIMIT = 20;
+// Subscription credit limits
+export const FREE_CREDIT_LIMIT = 5;
+export const STARTER_CREDIT_LIMIT = 20;
+export const PRO_CREDIT_LIMIT = 50;
+export const PRO_MAX_CREDIT_LIMIT = 500;
 
 // ============================================================================
 // Image Processing
