@@ -199,23 +199,27 @@ export interface ExtractRecipeFromUrlRequest {
 
 /**
  * Response after submitting a URL for extraction.
- * Returns the full extracted recipe data (processed synchronously).
+ * Can be either immediate (from cache) or queued for processing.
  */
 export interface ExtractRecipeFromUrlResponse {
   message: string;
   urlId: string;
   sourceUrl: string;
+  /** Normalized/canonical URL for the platform */
+  normalizedUrl: string;
   platform: VideoPlatform;
-  status: "completed";
+  status: "completed" | "queued";
   creditsUsed: number;
+  /** Timestamp when the URL was submitted */
+  submittedAt: string;
   /** Whether this URL was previously processed (dedup cache hit) */
-  fromCache: boolean;
-  /** Whether the content was identified as a recipe */
-  isRecipeVideo: boolean;
-  /** Confidence score 0-1 for the extraction quality */
-  confidence: number;
-  /** The fully extracted recipe with ingredients, steps, timings, etc. */
-  recipe: ExtractedRecipe;
+  fromCache?: boolean;
+  /** Whether the content was identified as a recipe (only present if status is "completed") */
+  isRecipeVideo?: boolean;
+  /** Confidence score 0-1 for the extraction quality (only present if status is "completed") */
+  confidence?: number;
+  /** The fully extracted recipe (only present if status is "completed") */
+  recipe?: ExtractedRecipe;
 }
 
 /**

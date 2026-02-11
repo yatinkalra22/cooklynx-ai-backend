@@ -190,7 +190,12 @@ export type CreditTransactionType =
   | "image_fix"
   | "video_analysis"
   | "video_fix"
-  | "url_recipe_extraction";
+  | "url_recipe_extraction"
+  | "image_analysis_refund"
+  | "image_fix_refund"
+  | "video_analysis_refund"
+  | "video_fix_refund"
+  | "url_recipe_extraction_refund";
 
 export interface CreditLedgerEntry {
   type: CreditTransactionType;
@@ -198,6 +203,8 @@ export interface CreditLedgerEntry {
   resourceId: string;
   timestamp: string;
   creditAfter: number;
+  /** Optional reason for the transaction (e.g., for refunds) */
+  reason?: string;
 }
 
 // ============================================================================
