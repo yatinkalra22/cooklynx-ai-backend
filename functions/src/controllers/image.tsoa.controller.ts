@@ -16,6 +16,7 @@ import {database} from "../config/firebase.config";
 import {StorageService} from "../services/storage.service";
 import {AIService, ContentModerationError} from "../services/ai.service";
 import {UserService} from "../services/user.service";
+import {PreferenceService} from "../services/preference.service";
 import {CacheService} from "../services/cache.service";
 import {DedupService} from "../services/dedup.service";
 import {CACHE_KEYS, CACHE_TTL} from "../config/redis.config";
@@ -261,6 +262,7 @@ export class ImageController extends Controller {
   /**
    * Async analysis job (runs in background)
    * OPTIMIZED: Batches database operations + caches results
+   * Includes personalized recommendations based on user preferences
    */
   private async analyzeImageAsync(
     userId: string,
@@ -272,8 +274,16 @@ export class ImageController extends Controller {
         analysisStatus: "processing",
       });
 
-      // Run AI analysis
-      const analysis = await AIService.analyzeFood(userId, imageId);
+      // Fetch user preferences for personalized recommendations
+      const userPreferences =
+        await PreferenceService.getUserPreferences(userId);
+
+      // Run AI analysis with optional personalization
+      const analysis = await AIService.analyzeFood(
+        userId,
+        imageId,
+        userPreferences
+      );
 
       const analysisData = {
         imageId,

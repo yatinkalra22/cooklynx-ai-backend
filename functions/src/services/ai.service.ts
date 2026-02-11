@@ -1,6 +1,7 @@
 import {geminiModel, geminiModerationModel} from "../config/firebase.config";
 import {StorageService} from "./storage.service";
 import {FoodAnalysis} from "../types/api.types";
+import {UserFoodPreferences} from "../types/preference.types";
 import * as logger from "firebase-functions/logger";
 
 /**
@@ -127,14 +128,16 @@ Be STRICT about safety. When in doubt, mark as unsafe. CSAM detection must have 
   /**
    * Analyze food image with Gemini AI
    * Automatically generates recipe recommendations based on detected items
+   * Optionally personalizes recommendations based on user preferences
    */
   static async analyzeFood(
     userId: string,
-    imageId: string
+    imageId: string,
+    userPreferences?: UserFoodPreferences | null
   ): Promise<FoodAnalysis> {
     // Download image from storage
     const imageBuffer = await StorageService.downloadImage(userId, imageId);
-    return this.analyzeFoodImageBuffer(imageBuffer, true);
+    return this.analyzeFoodImageBuffer(imageBuffer, true, userPreferences);
   }
 
   /**
@@ -142,16 +145,21 @@ Be STRICT about safety. When in doubt, mark as unsafe. CSAM detection must have 
    * OPTIMIZED: Single AI call analyzes ingredients AND generates recipes together
    * @param imageBuffer - Image to analyze
    * @param includeRecommendations - Whether to generate recipe recommendations (default: true)
+   * @param userPreferences - Optional user food preferences for personalization
    */
   static async analyzeFoodImageBuffer(
     imageBuffer: Buffer,
-    includeRecommendations = true
+    includeRecommendations = true,
+    userPreferences?: UserFoodPreferences | null
   ): Promise<FoodAnalysis> {
     // Convert to base64 for Gemini
     const base64Image = imageBuffer.toString("base64");
 
-    // Build combined analysis + recommendation prompt
-    const prompt = this.buildFoodAnalysisPrompt(includeRecommendations);
+    // Build combined analysis + recommendation prompt with optional personalization
+    const prompt = this.buildFoodAnalysisPrompt(
+      includeRecommendations,
+      userPreferences
+    );
 
     // Single AI call for both analysis and recommendations
     const requestGeminiAnalysis = () =>
@@ -182,9 +190,11 @@ Be STRICT about safety. When in doubt, mark as unsafe. CSAM detection must have 
   /**
    * Build food analysis prompt
    * OPTIMIZED: Combines ingredient detection + recipe recommendations in one prompt
+   * Supports personalized recommendations based on user preferences
    */
   private static buildFoodAnalysisPrompt(
-    includeRecommendations = true
+    includeRecommendations = true,
+    userPreferences?: UserFoodPreferences | null
   ): string {
     const basePrompt =
       "You are an expert culinary assistant and nutritionist. " +
@@ -219,6 +229,33 @@ ${analysisInstructions}
 Be precise and helpful. Return ONLY valid JSON.`;
     }
 
+    // Determine number of recommendations and personalization
+    const hasPreferences =
+      userPreferences && userPreferences.cuisines.length > 0;
+    const totalRecommendations = hasPreferences ? 5 : 3;
+    const personalizedCount = hasPreferences ? 3 : 0;
+    const randomCount = hasPreferences ? 2 : 3;
+
+    // Build personalization instructions
+    let personalizationInstructions = "";
+    if (hasPreferences) {
+      const cuisineList = userPreferences.cuisines.join(", ");
+      const dietaryInfo =
+        userPreferences.dietary && userPreferences.dietary.length > 0
+          ? ` The user follows these dietary preferences: ${userPreferences.dietary.join(", ")}.`
+          : "";
+
+      personalizationInstructions = `
+
+**PERSONALIZATION:**
+The user prefers ${cuisineList} cuisine(s).${dietaryInfo}
+
+- Generate ${personalizedCount} recipes that match their cuisine preferences
+- Generate ${randomCount} additional diverse recipes from other cuisines
+- Clearly mark which recipes are personalized vs. random in the "type" field
+- Ensure ALL recommendations respect their dietary preferences${dietaryInfo ? " (if specified)" : ""}`;
+    }
+
     // Combined prompt: Analysis + Recommendations in ONE AI call
     return `${basePrompt}
 
@@ -226,7 +263,7 @@ Be precise and helpful. Return ONLY valid JSON.`;
 ${analysisInstructions}
 
 **TASK 2: Recommend Recipes**
-Based on the identified ingredients, recommend 3 creative and delicious dishes that can be prepared.
+Based on the identified ingredients, recommend ${totalRecommendations} creative and delicious dishes that can be prepared.${personalizationInstructions}
 
 For each dish, provide:
 1. "name": Name of the dish
@@ -236,6 +273,7 @@ For each dish, provide:
 5. "cookingTime": Estimated time to prepare and cook
 6. "difficulty": Difficulty level ("easy", "medium", or "hard")
 7. "instructions": Step-by-step cooking instructions (array of strings)
+8. "type": "personalized" or "random" (indicates if this matches user preferences)
 
 Analyze the image and return ONLY a valid JSON object (no markdown, no explanations).
 
@@ -265,7 +303,8 @@ Analyze the image and return ONLY a valid JSON object (no markdown, no explanati
         "additionalIngredientsNeeded": ["soy sauce", "oil", "eggs"],
         "cookingTime": "25 mins",
         "difficulty": "easy",
-        "instructions": ["Step 1...", "Step 2..."]
+        "instructions": ["Step 1...", "Step 2..."],
+        "type": "personalized"
       }
     ],
     "summary": "Quick and easy meals using your ingredients"

@@ -43,6 +43,8 @@ export interface User {
   credit?: number;
   /** Maximum credits allowed for this user */
   creditLimit?: number;
+  /** Whether user has completed food preferences onboarding */
+  hasCompletedOnboarding?: boolean;
   /** Subscription information */
   subscription?: {
     plan: string;

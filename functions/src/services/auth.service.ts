@@ -2,6 +2,7 @@ import {UserRecord} from "firebase-admin/auth";
 import {auth, database} from "../config/firebase.config";
 import {LoginSuccessResponse} from "../types/api.types";
 import {SessionService} from "./session.service";
+import {PreferenceService} from "./preference.service";
 
 export interface IssueTokenOptions {
   /** The Firebase user record */
@@ -63,6 +64,11 @@ export async function issueAuthToken(
 
   await database.ref(`users/${userRecord.uid}`).update(updates);
 
+  // Check if user has completed onboarding (set food preferences)
+  const hasCompletedOnboarding = await PreferenceService.hasCompletedOnboarding(
+    userRecord.uid
+  );
+
   return {
     message,
     user: {
@@ -71,6 +77,7 @@ export async function issueAuthToken(
       displayName: userRecord.displayName || null,
       photoURL: userRecord.photoURL || undefined,
       emailVerified: userRecord.emailVerified,
+      hasCompletedOnboarding,
       ...profileData,
     },
     token: customToken,

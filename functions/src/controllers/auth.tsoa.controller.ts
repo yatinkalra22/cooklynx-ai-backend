@@ -181,6 +181,7 @@ export class AuthController extends Controller {
           email: userRecord.email!,
           displayName: userRecord.displayName || null,
           emailVerified: false,
+          hasCompletedOnboarding: false,
         },
         requiresEmailVerification: true,
       };
