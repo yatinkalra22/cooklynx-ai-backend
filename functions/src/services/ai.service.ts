@@ -262,7 +262,8 @@ The user prefers ${cuisineList} cuisine(s).${dietaryInfo}
 ${analysisInstructions}
 
 **TASK 2: Recommend Recipes**
-Based on the identified ingredients, recommend ${totalRecommendations} creative and delicious dishes that can be prepared.${personalizationInstructions}
+Based on the identified ingredients, recommend ${totalRecommendations} creative and
+delicious dishes that can be prepared.${personalizationInstructions}
 
 For each dish, provide:
 1. "name": Name of the dish
