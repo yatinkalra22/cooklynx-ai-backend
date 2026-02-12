@@ -59,12 +59,6 @@ export const CACHE_KEYS = {
   apiResponse: (endpoint: string, params: string) =>
     `api:${endpoint}:${params}`,
   rateLimit: (userId: string, endpoint: string) => `rl:${userId}:${endpoint}`,
-  // Video cache keys
-  videoMetadata: (videoId: string) => `video:${videoId}:metadata`,
-  videoList: (userId: string) => `user:${userId}:videos`,
-  videoAnalysis: (videoId: string) => `videoanalysis:${videoId}`,
-  videoProgress: (videoId: string) => `videoprogress:${videoId}`,
-  videoHash: (userId: string, hash: string) => `vhash:${userId}:${hash}`,
   // Asset cache keys
   assetList: (userId: string) => `user:${userId}:assets`,
   // URL recipe extraction cache keys

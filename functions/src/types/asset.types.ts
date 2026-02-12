@@ -1,10 +1,9 @@
 import {ImageMetadata} from "./api.types";
-import {VideoMetadata} from "./video.types";
 
 /**
- * Common asset type for both images and videos
+ * Common asset type (images only)
  */
-export type AssetType = "image" | "video";
+export type AssetType = "image";
 
 /**
  * Base properties shared by all assets
@@ -35,21 +34,9 @@ export interface ImageAsset extends AssetBase {
 }
 
 /**
- * Video asset wrapper
+ * Unified asset type (images only)
  */
-export interface VideoAsset extends AssetBase {
-  type: "video";
-  width: number;
-  height: number;
-  duration: number;
-  thumbnailPath: string;
-  originalData: VideoMetadata;
-}
-
-/**
- * Unified asset type
- */
-export type Asset = ImageAsset | VideoAsset;
+export type Asset = ImageAsset;
 
 /**
  * Response for asset list endpoint

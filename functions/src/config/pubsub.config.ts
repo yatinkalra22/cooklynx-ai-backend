@@ -1,6 +1,6 @@
 /**
  * Pub/Sub Configuration
- * Topic and subscription configuration for async video processing
+ * Topic and subscription configuration for async URL recipe extraction
  */
 
 import {PubSub} from "@google-cloud/pubsub";
@@ -8,7 +8,6 @@ import {VideoPlatform} from "../types/recipe-url.types";
 
 // Pub/Sub topic names
 export const PUBSUB_TOPICS = {
-  VIDEO_ANALYSIS_QUEUE: "video-analysis-queue",
   URL_RECIPE_EXTRACTION_QUEUE: "url-recipe-extraction-queue",
 } as const;
 
@@ -39,19 +38,6 @@ export async function publishMessage<T extends object>(
   const messageId = await topic.publishMessage({data: messageBuffer});
 
   return messageId;
-}
-
-/**
- * Publish a video analysis job to the queue
- */
-export async function publishVideoAnalysisJob(
-  videoId: string,
-  userId: string
-): Promise<string> {
-  return publishMessage(PUBSUB_TOPICS.VIDEO_ANALYSIS_QUEUE, {
-    videoId,
-    userId,
-  });
 }
 
 /**

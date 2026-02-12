@@ -1,12 +1,4 @@
-import {
-  Controller,
-  Get,
-  Request,
-  Response,
-  Route,
-  Security,
-  Tags,
-} from "tsoa";
+import {Controller, Get, Request, Response, Route, Security, Tags} from "tsoa";
 import {Request as ExpressRequest} from "express";
 import {AssetService} from "../services/asset.service";
 import {CacheService} from "../services/cache.service";
@@ -21,7 +13,7 @@ import * as logger from "firebase-functions/logger";
 @Security("BearerAuth")
 export class AssetController extends Controller {
   /**
-   * Get all assets (images and videos) uploaded by the authenticated user.
+   * Get all assets (images) uploaded by the authenticated user.
    * Assets are returned in reverse chronological order (newest first).
    * @summary List user's assets
    */
@@ -52,7 +44,10 @@ export class AssetController extends Controller {
       const result = {assets};
 
       // Cache result
-      const ttl = assets.length === 0 ? CACHE_TTL.API_RESPONSE_SHORT : CACHE_TTL.API_RESPONSE_MEDIUM;
+      const ttl =
+        assets.length === 0
+          ? CACHE_TTL.API_RESPONSE_SHORT
+          : CACHE_TTL.API_RESPONSE_MEDIUM;
       CacheService.set(cacheKey, result, ttl).catch(() => {});
 
       return result;

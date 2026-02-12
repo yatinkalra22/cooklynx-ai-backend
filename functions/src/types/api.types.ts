@@ -198,13 +198,9 @@ export interface ResendVerificationResponse {
 export type CreditTransactionType =
   | "image_analysis"
   | "image_fix"
-  | "video_analysis"
-  | "video_fix"
   | "url_recipe_extraction"
   | "image_analysis_refund"
   | "image_fix_refund"
-  | "video_analysis_refund"
-  | "video_fix_refund"
   | "url_recipe_extraction_refund"
   | "subscription_credit_reset"
   | "subscription_upgrade_bonus";
