@@ -17,9 +17,9 @@ import {
   SyncResponse,
   PLAN_CONFIG,
   PlanInfoResponse,
+  SubscriptionPlan,
 } from "../types/subscription.types";
 import {ErrorResponse} from "../types/api.types";
-import {SubscriptionPlan} from "../types/subscription.types";
 import * as logger from "firebase-functions/logger";
 
 @Route("v1/subscription")
@@ -67,7 +67,10 @@ export class SubscriptionController extends Controller {
       logger.info("subscription:sync:start", {userId: user.uid});
       const result = await SubscriptionService.syncSubscription(user.uid);
       const info = await SubscriptionService.getSubscriptionInfo(user.uid);
-      logger.info("subscription:sync:result", {userId: user.uid, plan: info.plan});
+      logger.info("subscription:sync:result", {
+        userId: user.uid,
+        plan: info.plan,
+      });
 
       return {
         message: "Subscription synced successfully",

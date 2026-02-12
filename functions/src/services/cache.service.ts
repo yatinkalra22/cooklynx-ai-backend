@@ -200,27 +200,4 @@ export class CacheService {
       this.delete(CACHE_KEYS.analysis(imageId)),
     ]).catch(() => {});
   }
-
-  // ============================================
-  // Video Cache Helpers (all NON-BLOCKING)
-  // ============================================
-
-  static async cacheVideoHash(
-    userId: string,
-    hash: string,
-    videoId: string
-  ): Promise<void> {
-    this.set(
-      CACHE_KEYS.videoHash(userId, hash),
-      videoId,
-      CACHE_TTL.IMAGE_HASH
-    ).catch(() => {});
-  }
-
-  static async getVideoByHash(
-    userId: string,
-    hash: string
-  ): Promise<string | null> {
-    return this.get<string>(CACHE_KEYS.videoHash(userId, hash));
-  }
 }

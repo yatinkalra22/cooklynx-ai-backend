@@ -254,6 +254,10 @@ export class ImageController extends Controller {
         };
       }
 
+      logger.error("Image upload error:", {
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+      });
       this.setStatus(500);
       throw {error: "Internal Server Error", message: "Failed to upload image"};
     }

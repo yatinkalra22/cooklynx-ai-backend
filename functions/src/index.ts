@@ -47,6 +47,9 @@ setGlobalOptions({
 // Create Express app
 const app = express();
 
+// Trust a single Cloud Run proxy hop for correct client IP handling
+app.set("trust proxy", 1);
+
 // Observability (Sentry)
 initObservability(app);
 

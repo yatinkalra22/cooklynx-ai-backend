@@ -169,7 +169,9 @@ export class UserService {
       const remaining = Math.max(0, creditLimit - currentCredit);
       throw {
         error: "Credit Limit Reached",
-        message: `Not enough credits. Required: ${amount}, Available: ${remaining}. Upgrade your plan for more credits.`,
+        message:
+          `Not enough credits. Required: ${amount}, Available: ${remaining}. ` +
+          "Upgrade your plan for more credits.",
       };
     }
 

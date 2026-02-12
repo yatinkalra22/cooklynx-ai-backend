@@ -7,13 +7,13 @@ development and production deployment.
 
 Before deploying, ensure these Google Cloud services are enabled:
 
-| Service           | Purpose                | How to Enable                                      |
-| ----------------- | ---------------------- | -------------------------------------------------- |
-| Cloud Functions   | API hosting            | Auto-enabled with Firebase                         |
-| Cloud Storage     | File storage           | Auto-enabled with Firebase                         |
-| Realtime Database | Metadata storage       | Auto-enabled with Firebase                         |
-| Cloud Pub/Sub     | Video processing queue | Enable in GCP Console                              |
-| Secret Manager    | Store API keys         | Auto-enabled with `firebase functions:secrets:set` |
+| Service           | Purpose                     | How to Enable                                      |
+| ----------------- | --------------------------- | -------------------------------------------------- |
+| Cloud Functions   | API hosting                 | Auto-enabled with Firebase                         |
+| Cloud Storage     | File storage                | Auto-enabled with Firebase                         |
+| Realtime Database | Metadata storage            | Auto-enabled with Firebase                         |
+| Cloud Pub/Sub     | URL recipe extraction queue | Enable in GCP Console                              |
+| Secret Manager    | Store API keys              | Auto-enabled with `firebase functions:secrets:set` |
 
 ### Enable Cloud Pub/Sub
 
@@ -24,30 +24,32 @@ gcloud services enable pubsub.googleapis.com
 # Or visit: https://console.cloud.google.com/apis/library/pubsub.googleapis.com
 ```
 
-### Create Pub/Sub Topic
+### Create Pub/Sub Topics
 
-The video processing feature requires a Pub/Sub topic:
+The URL recipe extraction feature requires a Pub/Sub topic:
 
 ```bash
-gcloud pubsub topics create video-analysis-queue
+gcloud pubsub topics create url-recipe-extraction
 ```
 
 ---
 
 ## Overview
 
-| Variable                | Local Dev   | Production           | Type   |
-| ----------------------- | ----------- | -------------------- | ------ |
-| `GEMINI_API_KEY`        | `.env` file | Firebase Secret      | Secret |
-| `WEB_API_KEY`           | `.env` file | Firebase Secret      | Secret |
-| `GOOGLE_CLIENT_ID`      | `.env` file | Environment variable | Config |
-| `FIREBASE_PROJECT_ID`   | `.env` file | Auto-configured      | Config |
-| `FIREBASE_DATABASE_URL` | `.env` file | Auto-configured      | Config |
-| `GCP_PROJECT_ID`        | `.env` file | Auto-configured      | Config |
-| `GCP_REGION`            | `.env` file | `firebase.json`      | Config |
-| `STORAGE_BUCKET`        | `.env` file | Auto-configured      | Config |
-| `MAX_IMAGE_SIZE`        | `.env` file | Environment variable | Config |
-| `ALLOWED_MIME_TYPES`    | `.env` file | Environment variable | Config |
+| Variable                    | Local Dev   | Production           | Type   |
+| --------------------------- | ----------- | -------------------- | ------ |
+| `GEMINI_API_KEY`            | `.env` file | Firebase Secret      | Secret |
+| `WEB_API_KEY`               | `.env` file | Firebase Secret      | Secret |
+| `GOOGLE_CLIENT_ID`          | `.env` file | Environment variable | Config |
+| `REVENUECAT_WEBHOOK_SECRET` | `.env` file | Firebase Secret      | Secret |
+| `REVENUECAT_API_KEY`        | `.env` file | Firebase Secret      | Secret |
+| `FIREBASE_PROJECT_ID`       | `.env` file | Auto-configured      | Config |
+| `FIREBASE_DATABASE_URL`     | `.env` file | Auto-configured      | Config |
+| `GCP_PROJECT_ID`            | `.env` file | Auto-configured      | Config |
+| `GCP_REGION`                | `.env` file | `firebase.json`      | Config |
+| `STORAGE_BUCKET`            | `.env` file | Auto-configured      | Config |
+| `MAX_IMAGE_SIZE`            | `.env` file | Environment variable | Config |
+| `ALLOWED_MIME_TYPES`        | `.env` file | Environment variable | Config |
 
 ---
 
@@ -71,6 +73,10 @@ WEB_API_KEY=your-firebase-web-api-key
 
 # Required for Google Sign-In
 GOOGLE_CLIENT_ID=your-google-client-id
+
+# Optional - for subscription management
+REVENUECAT_API_KEY=your-revenuecat-api-key
+REVENUECAT_WEBHOOK_SECRET=your-webhook-secret
 
 # Optional - override defaults
 CUSTOM_FUNCTION_REGION=us-central1
@@ -100,6 +106,15 @@ ALLOWED_MIME_TYPES=image/jpeg,image/png,image/webp
 3. Create OAuth 2.0 Client ID (Web application)
 4. Copy the Client ID to your `.env` file
 
+#### RevenueCat API Keys (for subscriptions)
+
+1. Go to [RevenueCat Dashboard](https://app.revenuecat.com/)
+2. Select your project
+3. API Keys section → Copy "Public Key" for frontend
+4. Copy "Secret Key" for backend (`REVENUECAT_API_KEY`)
+5. Webhooks → Create webhook → Copy "Authorization Header" value
+   (`REVENUECAT_WEBHOOK_SECRET`)
+
 ### 4. Run the Emulator
 
 ```bash
@@ -122,6 +137,8 @@ Google Cloud Secret Manager.
 # Set required secrets (sensitive data only)
 firebase functions:secrets:set GEMINI_API_KEY
 firebase functions:secrets:set WEB_API_KEY
+firebase functions:secrets:set REVENUECAT_API_KEY
+firebase functions:secrets:set REVENUECAT_WEBHOOK_SECRET
 
 # You'll be prompted to enter each value
 ```
@@ -143,6 +160,7 @@ needed.
 ```typescript
 // Already works - secrets are injected as env vars
 const apiKey = process.env.GEMINI_API_KEY;
+const revenuecatKey = process.env.REVENUECAT_API_KEY;
 ```
 
 #### Destroy a Secret
@@ -294,35 +312,35 @@ gcloud functions logs read api --region=us-central1
 
 ### Core Settings
 
-| Variable                      | Description                 | Required | Default                           |
-| ----------------------------- | --------------------------- | -------- | --------------------------------- |
-| `GEMINI_API_KEY`              | Google Gemini AI API key    | Yes      | -                                 |
-| `SENTRY_DSN`                  | Sentry DSN                  | No       | -                                 |
-| `SENTRY_TRACES_SAMPLE_RATE`   | Sentry traces sample rate   | No       | `0.1`                             |
-| `SENTRY_PROFILES_SAMPLE_RATE` | Sentry profiles sample rate | No       | `0.1`                             |
-| `SENTRY_RELEASE`              | Sentry release version      | No       | -                                 |
-| `SENTRY_ENVIRONMENT`          | Sentry environment          | No       | `NODE_ENV`                        |
-| `CUSTOM_FUNCTION_REGION`      | Cloud Functions region      | No       | `us-central1`                     |
-| `MAX_IMAGE_SIZE`              | Max upload size in bytes    | No       | `10485760` (10MB)                 |
-| `ALLOWED_MIME_TYPES`          | Comma-separated mime types  | No       | `image/jpeg,image/png,image/webp` |
+| Variable                      | Description                    | Required | Default                           |
+| ----------------------------- | ------------------------------ | -------- | --------------------------------- |
+| `GEMINI_API_KEY`              | Google Gemini AI API key       | Yes      | -                                 |
+| `WEB_API_KEY`                 | Firebase Web API Key           | Yes      | -                                 |
+| `GOOGLE_CLIENT_ID`            | Google OAuth Client ID         | Yes      | -                                 |
+| `REVENUECAT_API_KEY`          | RevenueCat Secret API Key      | Yes      | -                                 |
+| `REVENUECAT_WEBHOOK_SECRET`   | RevenueCat Webhook Auth        | No       | -                                 |
+| `SENTRY_DSN`                  | Sentry DSN                     | No       | -                                 |
+| `SENTRY_TRACES_SAMPLE_RATE`   | Sentry traces sample rate      | No       | `0.1`                             |
+| `SENTRY_PROFILES_SAMPLE_RATE` | Sentry profiles sample rate    | No       | `0.1`                             |
+| `SENTRY_RELEASE`              | Sentry release version         | No       | -                                 |
+| `SENTRY_ENVIRONMENT`          | Sentry environment             | No       | `NODE_ENV`                        |
+| `CUSTOM_FUNCTION_REGION`      | Cloud Functions region         | No       | `us-central1`                     |
+| `MAX_IMAGE_SIZE`              | Max upload size in bytes       | No       | `10485760` (10MB)                 |
+| `ALLOWED_MIME_TYPES`          | Comma-separated mime types     | No       | `image/jpeg,image/png,image/webp` |
+| `ALLOWED_ORIGINS`             | CORS origins (comma-separated) | No       | Production + dev URLs             |
 
-### Video Processing (Hardcoded Constants)
+### Subscription Plans (Hardcoded Constants)
 
-These are defined in `src/config/constants.ts` and not configurable via env:
+These are defined in `src/types/subscription.types.ts` and not configurable via
+env:
 
-| Constant                      | Value      | Description                            |
-| ----------------------------- | ---------- | -------------------------------------- |
-| `VIDEO_MAX_SIZE`              | 50MB       | Maximum video file size                |
-| `VIDEO_MAX_DURATION`          | 60 seconds | Maximum video duration                 |
-| `VIDEO_CREDIT_COST`           | 2 credits  | Credits consumed per video upload      |
-| `VIDEO_FIX_CREDIT_COST`       | 2 credits  | Credits consumed per video fix         |
-| `VIDEO_FRAME_INTERVAL`        | 5 seconds  | Frame extraction interval for analysis |
-| `VIDEO_MAX_FRAMES`            | 12 frames  | Maximum frames to analyze              |
-| `VIDEO_MODERATION_BATCH_SIZE` | 4 frames   | Parallel moderation batch size         |
-
-**Note:** Video fixes now use direct video-to-video generation instead of
-frame-by-frame processing. The frame extraction constants apply to video
-analysis only.
+| Constant             | Value       | Description                         |
+| -------------------- | ----------- | ----------------------------------- |
+| `FREE_CREDIT_LIMIT`  | 20 credits  | Free tier beta credit limit         |
+| `PRO_MONTHLY_LIMIT`  | 100 credits | Pro plan monthly credit limit       |
+| `PREMIUM_LIMIT`      | -1          | Premium plan (unlimited)            |
+| `IMAGE_CREDIT_COST`  | 1 credit    | Credits consumed per image upload   |
+| `RECIPE_CREDIT_COST` | 1 credit    | Credits consumed per URL extraction |
 
 ---
 

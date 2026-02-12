@@ -90,47 +90,6 @@ export const DIETARY_DESCRIPTIONS = {
 };
 
 // ============================================================================
-// Video Processing
-// ============================================================================
-
-// Maximum video file size (50MB)
-export const VIDEO_MAX_SIZE = 50 * 1024 * 1024;
-
-// Maximum video duration in seconds (60s)
-export const VIDEO_MAX_DURATION = 60;
-
-// Credits consumed per video analysis
-export const VIDEO_CREDIT_COST = 2;
-
-// Allowed video mime types
-export const VIDEO_ALLOWED_MIME_TYPES = [
-  "video/mp4",
-  "video/quicktime",
-  "video/webm",
-];
-
-// Extract a frame every N seconds (used for fallback thumbnail extraction only)
-export const VIDEO_FRAME_INTERVAL = 5;
-
-// Maximum frames to extract and analyze (legacy - for backward compatibility)
-export const VIDEO_MAX_FRAMES = 12;
-
-// Maximum problem frames to extract (frames only at problem timestamps)
-export const VIDEO_MAX_PROBLEM_FRAMES = 6;
-
-// Batch size for parallel frame moderation
-export const VIDEO_MODERATION_BATCH_SIZE = 4;
-
-// Maximum additional frames to extract at exact problem timestamps
-export const VIDEO_MAX_EXACT_FRAMES = 6;
-
-// Threshold in seconds for deduplicating frames (skip if within this of existing frame)
-export const VIDEO_FRAME_DEDUP_THRESHOLD = 1;
-
-// Representative frame positions (percentage of video duration) for general fixes
-export const VIDEO_REPRESENTATIVE_FRAMES = [0.1, 0.5, 0.9];
-
-// ============================================================================
 // URL Recipe Extraction
 // ============================================================================
 

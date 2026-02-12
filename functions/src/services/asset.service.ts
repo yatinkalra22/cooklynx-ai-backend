@@ -1,23 +1,19 @@
 import {database} from "../config/firebase.config";
-import {VideoService} from "./video.service";
 import {ImageMetadata} from "../types/api.types";
-import {Asset, ImageAsset, VideoAsset} from "../types/asset.types";
+import {Asset, ImageAsset} from "../types/asset.types";
 
 export class AssetService {
   /**
-   * List all assets (images and videos) for a user, sorted by date descending.
+   * List all assets (images only) for a user, sorted by date descending.
    */
   static async listAssets(userId: string): Promise<Asset[]> {
-    // Fetch images and videos in parallel
-    const [images, videos] = await Promise.all([
-      this.listImages(userId),
-      VideoService.listVideos(userId),
-    ]);
+    // Fetch images
+    const images = await this.listImages(userId);
 
     // Map to unified Asset type with storage paths
-    const imageAssets: ImageAsset[] = images.map((img) => ({
+    const imageAssets: ImageAsset[] = images.map((img: ImageMetadata) => ({
       id: img.imageId,
-      type: "image",
+      type: "image" as const,
       storagePath: img.storagePath,
       uploadedAt: img.uploadedAt,
       analysisStatus: img.analysisStatus,
@@ -31,34 +27,13 @@ export class AssetService {
       originalData: img,
     }));
 
-    const videoAssets: VideoAsset[] = videos.map((vid) => ({
-      id: vid.videoId,
-      type: "video",
-      storagePath: vid.videoStoragePath,
-      thumbnailPath: vid.thumbnailStoragePath,
-      uploadedAt: vid.uploadedAt,
-      analysisStatus: vid.analysisStatus,
-      overallScore: vid.overallScore,
-      originalName: vid.originalName,
-      mimeType: vid.mimeType,
-      size: vid.size,
-      width: vid.width,
-      height: vid.height,
-      duration: vid.duration,
-      fixCount: vid.fixCount || 0,
-      originalData: vid,
-    }));
-
-    // Combine and sort
-    const allAssets: Asset[] = [...imageAssets, ...videoAssets];
-
     // Sort by uploadedAt descending (newest first)
-    allAssets.sort(
+    imageAssets.sort(
       (a, b) =>
         new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime()
     );
 
-    return allAssets;
+    return imageAssets;
   }
 
   /**
