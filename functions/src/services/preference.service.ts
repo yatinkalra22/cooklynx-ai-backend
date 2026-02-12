@@ -8,21 +8,56 @@ import * as logger from "firebase-functions/logger";
 
 export class PreferenceService {
   /**
+   * Helper for retry logic with exponential backoff
+   */
+  private static async retryWithBackoff<T>(
+    fn: () => Promise<T>,
+    maxRetries: number = 3,
+    baseDelayMs: number = 50
+  ): Promise<T> {
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      try {
+        return await fn();
+      } catch (error: unknown) {
+        const errorMsg = error instanceof Error ? error.message : String(error);
+        const isListenTwiceError = errorMsg.includes("listen() called twice");
+        const isLastAttempt = attempt === maxRetries - 1;
+
+        if (isListenTwiceError && !isLastAttempt) {
+          // Firebase compat layer listener conflict - retry with backoff
+          const delayMs = baseDelayMs * Math.pow(2, attempt);
+          logger.info(
+            `Firebase listen conflict detected, retrying after ${delayMs}ms (attempt ${attempt + 1}/${maxRetries})`
+          );
+          await new Promise((resolve) => setTimeout(resolve, delayMs));
+        } else {
+          throw error;
+        }
+      }
+    }
+    throw new Error("Max retries exceeded for Firebase database operation");
+  }
+
+  /**
    * Get user's food preferences from Realtime Database
+   * Includes retry logic for Firebase compat SDK listener conflicts
    */
   static async getUserPreferences(
     userId: string
   ): Promise<UserFoodPreferences | null> {
     try {
-      const snapshot = await database
-        .ref(`users/${userId}/preferences`)
-        .once("value");
-
-      if (!snapshot.exists()) {
-        return null;
-      }
-
-      return snapshot.val() as UserFoodPreferences;
+      const result = await this.retryWithBackoff(() =>
+        database
+          .ref(`users/${userId}/preferences`)
+          .once("value")
+          .then((snapshot) => {
+            if (!snapshot.exists()) {
+              return null;
+            }
+            return snapshot.val() as UserFoodPreferences;
+          })
+      );
+      return result;
     } catch (error) {
       logger.error("Error fetching user preferences:", error);
       throw error;

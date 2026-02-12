@@ -53,7 +53,18 @@ import {
 } from "../utils/validation.utils";
 import {SessionService} from "../services/session.service";
 
-const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+// Lazy-initialized so GOOGLE_CLIENT_ID secret is available at request time
+let googleClient: OAuth2Client | null = null;
+function getGoogleClient(): OAuth2Client {
+  if (!googleClient) {
+    const clientId = process.env.GOOGLE_CLIENT_ID;
+    if (!clientId) {
+      throw new Error("GOOGLE_CLIENT_ID is not set in environment");
+    }
+    googleClient = new OAuth2Client(clientId);
+  }
+  return googleClient;
+}
 
 @Route("v1/auth")
 @Tags("Auth")
@@ -333,7 +344,8 @@ export class AuthController extends Controller {
 
     try {
       // Verify Google ID token
-      const ticket = await googleClient.verifyIdToken({
+      const client = getGoogleClient();
+      const ticket = await client.verifyIdToken({
         idToken,
         audience: process.env.GOOGLE_CLIENT_ID,
       });
@@ -434,6 +446,11 @@ export class AuthController extends Controller {
       if (errType === "Unauthorized" || errType === "Forbidden") {
         throw error;
       }
+      logger.error("Google sign-in error:", {
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        googleClientId: process.env.GOOGLE_CLIENT_ID ? "set" : "NOT SET",
+      });
       this.setStatus(HTTP_STATUS.INTERNAL_SERVER_ERROR);
       throw {error: "Internal Server Error", message: "Google sign-in failed"};
     }

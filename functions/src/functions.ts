@@ -9,10 +9,6 @@ import * as logger from "firebase-functions/logger";
 
 // Define secrets (sensitive data only)
 const webApiKey = defineSecret("WEB_API_KEY");
-const geminiApiKey = defineSecret("GEMINI_API_KEY");
-const googleClientId = defineSecret("GOOGLE_CLIENT_ID");
-const sentryDsn = defineSecret("SENTRY_DSN");
-const revenueCatSecretApiKey = defineSecret("REVENUECAT_SECRET_API_KEY");
 
 // Get region from environment variable or default to us-central1
 const REGION = (process.env.CUSTOM_FUNCTION_REGION || "us-central1") as
@@ -24,13 +20,7 @@ const REGION = (process.env.CUSTOM_FUNCTION_REGION || "us-central1") as
 export const api = onRequest(
   {
     region: REGION,
-    secrets: [
-      webApiKey,
-      geminiApiKey,
-      googleClientId,
-      sentryDsn,
-      revenueCatSecretApiKey,
-    ],
+    secrets: [webApiKey],
   },
   app
 );
