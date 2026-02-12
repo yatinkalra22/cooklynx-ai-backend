@@ -30,12 +30,28 @@ export class WebhookController extends Controller {
     @Request() request: ExpressRequest,
     @Body() body: RevenueCatWebhookEvent
   ): Promise<{status: string}> {
+    logger.info("webhook:revenuecat — incoming event", {
+      type: body?.event?.type,
+      eventId: body?.event?.id,
+    });
+
     // Validate webhook authorization
     const webhookSecret = process.env.REVENUECAT_WEBHOOK_SECRET;
     const authHeader = request.headers.authorization;
 
     if (webhookSecret) {
-      if (!authHeader || authHeader !== `Bearer ${webhookSecret}`) {
+      // Allow both 'Bearer <secret>' and just '<secret>' for flexibility
+      const isValid =
+        authHeader === `Bearer ${webhookSecret}` ||
+        authHeader === webhookSecret;
+
+      if (!authHeader || !isValid) {
+        logger.warn("webhook:revenuecat — unauthorized attempt", {
+          hasAuthHeader: !!authHeader,
+          requestId: (request.res?.locals as {requestId?: string} | undefined)
+            ?.requestId,
+        });
+
         this.setStatus(401);
         throw {
           error: "Unauthorized",

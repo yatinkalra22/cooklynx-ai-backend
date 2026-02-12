@@ -103,23 +103,23 @@ export interface RevenueCatWebhookEvent {
     type: RevenueCatWebhookEventType;
     app_user_id: string;
     original_app_user_id: string;
-    product_id: string;
-    entitlement_ids: string[] | null;
-    period_type: "NORMAL" | "TRIAL" | "INTRO";
-    purchased_at_ms: number;
-    expiration_at_ms: number | null;
-    store: string;
-    environment: "SANDBOX" | "PRODUCTION";
-    is_family_share: boolean;
-    country_code: string;
-    currency: string;
-    price_in_purchased_currency: number;
+    product_id?: string;
+    entitlement_ids?: string[] | null;
+    period_type?: "NORMAL" | "TRIAL" | "INTRO";
+    purchased_at_ms?: number;
+    expiration_at_ms?: number | null;
+    store?: string;
+    environment?: "SANDBOX" | "PRODUCTION";
+    is_family_share?: boolean;
+    country_code?: string;
+    currency?: string;
+    price_in_purchased_currency?: number;
     subscriber_attributes?: Record<
       string,
       {value: string; updated_at_ms: number}
     >;
-    transaction_id: string;
-    original_transaction_id: string;
+    transaction_id?: string;
+    original_transaction_id?: string;
     /** Present for PRODUCT_CHANGE events */
     new_product_id?: string;
   };
