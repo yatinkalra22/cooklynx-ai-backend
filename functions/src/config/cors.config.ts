@@ -15,6 +15,8 @@ const allowedOrigins = [
   "http://localhost:3000",
   "http://localhost:8081",
   "exp://localhost:8081",
+  "http://10.0.2.2:5001",
+  "http://10.0.2.2:8081",
 ];
 
 // Add additional origins from environment variable
