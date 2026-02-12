@@ -16,17 +16,17 @@ REST API for CookLynx AI - Recipe and cooking powered by AI.
 
 ### Swagger UI
 
-| Environment | URL                                                                    |
-| ----------- | ---------------------------------------------------------------------- |
-| Local       | `http://localhost:5001/cooklynx-ai/us-central1/api/swagger`      |
-| Production  | `https://us-central1-cooklynx-ai.cloudfunctions.net/api/swagger` |
+| Environment | URL                                                                            |
+| ----------- | ------------------------------------------------------------------------------ |
+| Local       | `http://localhost:5001/ubique-parc-1533053411402/us-central1/api/swagger`      |
+| Production  | `https://us-central1-ubique-parc-1533053411402.cloudfunctions.net/api/swagger` |
 
 ### OpenAPI Spec (JSON)
 
-| Environment | URL                                                                      |
-| ----------- | ------------------------------------------------------------------------ |
-| Local       | `http://localhost:5001/cooklynx-ai/us-central1/api/docs.json`      |
-| Production  | `https://us-central1-cooklynx-ai.cloudfunctions.net/api/docs.json` |
+| Environment | URL                                                                              |
+| ----------- | -------------------------------------------------------------------------------- |
+| Local       | `http://localhost:5001/ubique-parc-1533053411402/us-central1/api/docs.json`      |
+| Production  | `https://us-central1-ubique-parc-1533053411402.cloudfunctions.net/api/docs.json` |
 
 > ⚠️ **Note on URL Paths:** The local URLs include `/api` because Firebase
 > Emulator mirrors the full function path. In production, Firebase automatically
@@ -36,7 +36,7 @@ REST API for CookLynx AI - Recipe and cooking powered by AI.
 ## API Endpoints
 
 All endpoints below are relative to the base URL (e.g.,
-`http://localhost:5001/cooklynx-ai/us-central1/api/v1/auth/signup`)
+`http://localhost:5001/ubique-parc-1533053411402/us-central1/api/v1/auth/signup`)
 
 ### Health
 
@@ -140,8 +140,12 @@ Advantages:
 ```bash
 cd functions
 npm install
-cp env.example.txt .env.local  # Configure environment variables
+cp .env .env.local  # Copy environment template
+# Edit .env.local with your actual API keys and secrets
 ```
+
+> **Note:** `.env.local` is gitignored and contains your actual secrets. The
+> `.env` file is a template with placeholder values.
 
 ### Run Locally
 
@@ -249,10 +253,10 @@ The deployment process automatically:
 **Important:** Firebase Cloud Functions automatically strip the function name
 from the path:
 
-| Context            | Base URL                                                       | Example Endpoint | Full URL                                                                     |
-| ------------------ | -------------------------------------------------------------- | ---------------- | ---------------------------------------------------------------------------- |
-| **Local Emulator** | `http://localhost:5001/cooklynx-ai/us-central1/api`      | `/v1/auth/login` | `http://localhost:5001/cooklynx-ai/us-central1/api/v1/auth/login`      |
-| **Production**     | `https://us-central1-cooklynx-ai.cloudfunctions.net/api` | `/v1/auth/login` | `https://us-central1-cooklynx-ai.cloudfunctions.net/api/v1/auth/login` |
+| Context            | Base URL                                                               | Example Endpoint | Full URL                                                                             |
+| ------------------ | ---------------------------------------------------------------------- | ---------------- | ------------------------------------------------------------------------------------ |
+| **Local Emulator** | `http://localhost:5001/ubique-parc-1533053411402/us-central1/api`      | `/v1/auth/login` | `http://localhost:5001/ubique-parc-1533053411402/us-central1/api/v1/auth/login`      |
+| **Production**     | `https://us-central1-ubique-parc-1533053411402.cloudfunctions.net/api` | `/v1/auth/login` | `https://us-central1-ubique-parc-1533053411402.cloudfunctions.net/api/v1/auth/login` |
 
 **Why the difference?**
 
@@ -305,4 +309,38 @@ Get tokens via:
 
 ## Environment Variables
 
-See `env.example.txt` for required configuration.
+### Local Development
+
+Create `.env.local` from the template:
+
+```bash
+cp .env .env.local
+```
+
+Then edit `.env.local` with your actual values:
+
+```bash
+# Required for local development
+GEMINI_API_KEY=your-gemini-api-key        # Get from https://aistudio.google.com/apikey
+WEB_API_KEY=your-firebase-web-api-key     # From Firebase Console > Project Settings
+GOOGLE_CLIENT_ID=your-google-client-id    # From Google Cloud Console
+
+# Optional
+REVENUECAT_SECRET_API_KEY=your-revenuecat-key
+ADMIN_SECRET_KEY=your-admin-secret
+```
+
+**Priority:** `.env.local` (your secrets) → `.env` (template defaults)
+
+### Production Deployment
+
+Use Firebase Secret Manager for sensitive data:
+
+```bash
+firebase functions:secrets:set GEMINI_API_KEY
+firebase functions:secrets:set WEB_API_KEY
+firebase functions:secrets:set GOOGLE_CLIENT_ID
+firebase functions:secrets:set REVENUECAT_SECRET_API_KEY
+```
+
+See `.env` file for all available configuration options.
