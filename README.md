@@ -5,15 +5,19 @@ platform. Built with Express.js, TypeScript, and Firebase Cloud Functions.
 
 ## Features
 
-- **Food Image Analysis** - Upload photos of ingredients, get AI-detected items + 3 recipe recommendations
-- **Recipe Extraction from Any URL** - Paste a YouTube, Instagram, TikTok, or any recipe URL and get a complete grocery-list-ready recipe extracted by AI
+- **Food Image Analysis** - Upload photos of ingredients, get AI-detected
+  items + 3 recipe recommendations
+- **Recipe Extraction from Any URL** - Paste a YouTube, Instagram, TikTok, or
+  any recipe URL and get a complete grocery-list-ready recipe extracted by AI
+- **User Preferences** - Save dietary restrictions, cuisine preferences, and
+  allergies for personalized recommendations
+- **Subscription Management** - RevenueCat integration for in-app purchases and
+  subscription tracking
 - **Google & Custom Login** - Firebase Auth with email/password and Google OAuth
-- **Gemini AI Integration** - AI-powered analysis and generation
-- **Video Processing** - Record walkthroughs and get timeline-based feedback
-- **AI Fix Generation** - Generate AI-improved images/videos
-- **Atomic Credit System** - Race-condition-free credit reservation
+- **Gemini AI Integration** - AI-powered food analysis and recipe extraction
 - **Content Deduplication** - SHA-256 hashing avoids re-processing
 - **Content Moderation** - AI-powered safety checks on all uploads
+- **Session Management** - Track user sessions with device fingerprinting
 - **OpenAPI/Swagger** - Auto-generated API docs at `/swagger`
 
 ## Tech Stack
@@ -26,10 +30,10 @@ platform. Built with Express.js, TypeScript, and Firebase Cloud Functions.
 | **Firebase Cloud Functions v2** | Serverless compute (Cloud Run-based)         |
 | **Firebase Realtime Database**  | Primary database                             |
 | **Firebase Auth**               | Authentication (email + Google)              |
-| **Google Cloud Storage**        | File storage (images, videos, frames)        |
+| **Google Cloud Storage**        | File storage (images)                        |
 | **Google Cloud Pub/Sub**        | Async processing queues                      |
-| **Google Gemini AI**            | Analysis, recipe extraction, moderation      |
-| **FFmpeg**                      | Video frame extraction & validation          |
+| **Google Gemini AI**            | Food analysis, recipe extraction, moderation |
+| **RevenueCat**                  | Subscription management & in-app purchases   |
 | **Sharp**                       | Image optimization & resizing                |
 | **Redis** (optional)            | Non-blocking cache layer                     |
 | **Sentry**                      | Error tracking & performance profiling       |
@@ -46,24 +50,26 @@ Client Request
     +-- Middleware: Auth (Firebase ID tokens) + Rate Limiting + Security Headers
     |
     +-- Controllers
-    |     +-- /v1/auth/*        Authentication & user management
-    |     +-- /v1/images/*      Image upload & food analysis + recipes
-    |     +-- /v1/recipes/*     URL recipe extraction (any URL)
-    |     +-- /v1/videos/*      Video upload & room analysis
-    |     +-- /v1/assets/*      Unified asset listing
+    |     +-- /v1/auth/*               Authentication & user management
+    |     +-- /v1/images/*             Image upload & food analysis + recipes
+    |     +-- /v1/recipes/*            URL recipe extraction (any URL)
+    |     +-- /v1/user/preferences     Food preferences & dietary restrictions
+    |     +-- /v1/subscription/*       Subscription management (RevenueCat)
+    |     +-- /v1/webhooks/*           RevenueCat webhook handler
+    |     +-- /v1/assets/*             Unified asset listing
     |
     +-- Services
-    |     +-- AIService             Gemini AI (food analysis, moderation)
-    |     +-- UrlRecipeService      URL recipe extraction (YouTube + URL Context)
-    |     +-- StorageService        Cloud Storage (upload, optimize, signed URLs)
-    |     +-- VideoService          Video processing (Pub/Sub workers)
-    |     +-- UserService           Credits, profiles, content violations
-    |     +-- CacheService          Non-blocking Redis caching
-    |     +-- DedupService          SHA256 duplicate detection
+    |     +-- AIService                Gemini AI (food analysis, moderation)
+    |     +-- UrlRecipeService         URL recipe extraction (YouTube + URL Context)
+    |     +-- PreferenceService        User food preferences
+    |     +-- SubscriptionService      RevenueCat integration & credit management
+    |     +-- StorageService           Cloud Storage (upload, optimize, signed URLs)
+    |     +-- UserService              User profiles, credits, session management
+    |     +-- CacheService             Non-blocking Redis caching
+    |     +-- DedupService             SHA256 duplicate detection
     |
     +-- Async Workers (Pub/Sub)
-          +-- videoAnalysisWorker           Video processing pipeline
-          +-- urlRecipeExtractionWorker     URL recipe extraction via Gemini
+          +-- urlRecipeExtractionWorker      URL recipe extraction via Gemini
 ```
 
 ### How URL Recipe Extraction Works
@@ -85,13 +91,13 @@ Stored in Firebase RTDB --> Client polls for results
 Frontend keeps original URL for embed/preview (no downloads, no storage)
 ```
 
-| Platform | Method | What AI Sees |
-| -------- | ------ | ------------ |
-| YouTube | Gemini `fileData` | Watches the full video (audio + visuals) |
-| Instagram | Gemini URL Context | Reads post caption, description, comments |
-| TikTok | Gemini URL Context | Reads video description, pinned comments |
-| Recipe blogs | Gemini URL Context | Reads full recipe page (best quality) |
-| Any other URL | Gemini URL Context | Best-effort from page content |
+| Platform      | Method             | What AI Sees                              |
+| ------------- | ------------------ | ----------------------------------------- |
+| YouTube       | Gemini `fileData`  | Watches the full video (audio + visuals)  |
+| Instagram     | Gemini URL Context | Reads post caption, description, comments |
+| TikTok        | Gemini URL Context | Reads video description, pinned comments  |
+| Recipe blogs  | Gemini URL Context | Reads full recipe page (best quality)     |
+| Any other URL | Gemini URL Context | Best-effort from page content             |
 
 ## Quick Start
 
@@ -154,85 +160,112 @@ cooklynx-ai-backend/
         swagger.json             Auto-generated OpenAPI 3.0 spec
   docs/
     local-setup.md               Local development guide
+    environment-setup.md         Environment variables & secrets
+    deployment.md                Production deployment guide
+    infra-setup.md               Infrastructure setup (Firebase, GCP)
+    architecture.md              System architecture overview
     recipe-recommendations.md    Image recipe recommendation architecture
     url-recipe-extraction.md     URL recipe extraction architecture
+    caching.md                   Redis caching & deduplication
+    cost-estimation.md           Cost estimates for GCP services
+    security-improvements.md     Security features & best practices
+    FRONTEND_REVENUECAT_INTEGRATION.md  Frontend subscription integration
 ```
 
 ## API Endpoints
 
 ### Authentication
-| Route                          | Method | Purpose                | Auth |
-| ------------------------------ | ------ | ---------------------- | ---- |
-| `/v1/auth/signup`              | POST   | Create account         | No   |
-| `/v1/auth/login`               | POST   | Login (email/password) | No   |
-| `/v1/auth/google`              | POST   | Google sign-in         | No   |
-| `/v1/auth/me`                  | GET    | Get profile + credits  | Yes  |
-| `/v1/auth/profile`             | PATCH  | Update name/photo      | Yes  |
-| `/v1/auth/account`             | DELETE | Delete account         | Yes  |
-| `/v1/auth/verification/resend` | POST   | Resend verification    | No   |
+
+| Route                          | Method | Purpose                 | Auth |
+| ------------------------------ | ------ | ----------------------- | ---- |
+| `/v1/auth/signup`              | POST   | Create account          | No   |
+| `/v1/auth/login`               | POST   | Login (email/password)  | No   |
+| `/v1/auth/google`              | POST   | Google sign-in          | No   |
+| `/v1/auth/me`                  | GET    | Get profile + credits   | Yes  |
+| `/v1/auth/profile`             | PATCH  | Update name/photo       | Yes  |
+| `/v1/auth/account`             | DELETE | Delete account          | Yes  |
+| `/v1/auth/logout`              | POST   | Logout (revoke session) | Yes  |
+| `/v1/auth/verification/resend` | POST   | Resend verification     | No   |
 
 ### Images (Food Analysis) - 1 credit per upload
-| Route                          | Method | Purpose                              | Auth |
-| ------------------------------ | ------ | ------------------------------------ | ---- |
-| `/v1/images/upload`            | POST   | Upload image for analysis            | Yes  |
-| `/v1/images`                   | GET    | List user's images                   | Yes  |
-| `/v1/images/{id}`              | GET    | Get image metadata                   | Yes  |
-| `/v1/images/{id}/analysis`     | GET    | Get analysis + recipe recommendations | Yes  |
-| `/v1/images/{id}/url`          | GET    | Get signed download URL              | Yes  |
+
+| Route                      | Method | Purpose                               | Auth |
+| -------------------------- | ------ | ------------------------------------- | ---- |
+| `/v1/images/upload`        | POST   | Upload image for analysis             | Yes  |
+| `/v1/images`               | GET    | List user's images                    | Yes  |
+| `/v1/images/{id}`          | GET    | Get image metadata                    | Yes  |
+| `/v1/images/{id}/analysis` | GET    | Get analysis + recipe recommendations | Yes  |
+| `/v1/images/{id}/url`      | GET    | Get signed download URL               | Yes  |
 
 ### Recipes (URL Extraction) - 1 credit per URL
+
 | Route                          | Method | Purpose                              | Auth |
 | ------------------------------ | ------ | ------------------------------------ | ---- |
 | `/v1/recipes/extract-from-url` | POST   | Extract recipe from any URL          | Yes  |
 | `/v1/recipes/url/{urlId}`      | GET    | Get extraction status/results (poll) | Yes  |
 | `/v1/recipes/urls`             | GET    | List user's URL extractions          | Yes  |
 
-### Videos (Room Analysis) - 2 credits per upload
-| Route                          | Method | Purpose                | Auth |
-| ------------------------------ | ------ | ---------------------- | ---- |
-| `/v1/videos/upload`            | POST   | Upload video           | Yes  |
-| `/v1/videos/{id}/analysis`     | GET    | Get analysis (poll)    | Yes  |
-| `/v1/videos`                   | GET    | List user's videos     | Yes  |
+### Preferences
+
+| Route                        | Method | Purpose                        | Auth |
+| ---------------------------- | ------ | ------------------------------ | ---- |
+| `/v1/food-preferences/types` | GET    | Get available preference types | No   |
+| `/v1/user/preferences`       | GET    | Get user's preferences         | Yes  |
+| `/v1/user/preferences`       | POST   | Save/update preferences        | Yes  |
+| `/v1/user/preferences`       | DELETE | Clear preferences              | Yes  |
+
+### Subscriptions
+
+| Route                    | Method | Purpose               | Auth |
+| ------------------------ | ------ | --------------------- | ---- |
+| `/v1/subscription`       | GET    | Get subscription info | Yes  |
+| `/v1/subscription/sync`  | POST   | Sync from RevenueCat  | Yes  |
+| `/v1/subscription/plans` | GET    | List available plans  | No   |
 
 ### Other
-| Route                          | Method | Purpose                | Auth |
-| ------------------------------ | ------ | ---------------------- | ---- |
-| `/v1/assets`                   | GET    | List all images+videos | Yes  |
-| `/health`                      | GET    | Health check           | No   |
+
+| Route        | Method | Purpose         | Auth |
+| ------------ | ------ | --------------- | ---- |
+| `/v1/assets` | GET    | List all images | Yes  |
+| `/health`    | GET    | Health check    | No   |
 
 Full OpenAPI spec available at `/swagger` when running.
 
 ## Gemini AI Models
 
-| Model | Purpose | Cost |
-|-------|---------|------|
-| `gemini-3-flash-preview` | Food image analysis, video analysis, URL recipe extraction | Paid |
-| `gemini-3-pro-image-preview` | Image generation (fix feature) | Paid |
-| `gemini-2.0-flash` | Content moderation (safety checks) | Free tier eligible |
+| Model                    | Purpose                                    | Cost               |
+| ------------------------ | ------------------------------------------ | ------------------ |
+| `gemini-3-flash-preview` | Food image analysis, URL recipe extraction | Paid               |
+| `gemini-2.0-flash`       | Content moderation (safety checks)         | Free tier eligible |
 
-## Credit System
+## Subscription Plans
 
-Users have a beta credit limit (default: 20 credits). Credits are reserved
-atomically before processing using Firebase transactions.
+The app uses RevenueCat for subscription management. Three tiers are available:
 
-| Action | Cost |
-|--------|------|
-| Image upload + food analysis | 1 credit |
-| URL recipe extraction | 1 credit |
-| Video upload + room analysis | 2 credits |
+| Plan        | Credits         | Price     | Features                                    |
+| ----------- | --------------- | --------- | ------------------------------------------- |
+| **Free**    | 20 beta credits | $0        | Limited trial usage                         |
+| **Pro**     | 100/month       | $9.99/mo  | Unlimited food analysis & recipe extraction |
+| **Premium** | Unlimited       | $19.99/mo | All Pro features + priority support         |
+
+### Credit Costs
+
+| Action                                                | Cost     |
+| ----------------------------------------------------- | -------- |
+| Image upload + food analysis + recipe recommendations | 1 credit |
+| URL recipe extraction (any platform)                  | 1 credit |
 
 ## Cost Estimates (Gemini API)
 
-| Feature | Cost per request | At 1,000/day |
-|---------|-----------------|--------------|
-| Image analysis (food + recipes) | ~$0.15 | ~$150/day |
-| URL recipe extraction (YouTube) | ~$0.01 | ~$10/day |
-| URL recipe extraction (webpage) | ~$0.005 | ~$5/day |
-| Content moderation | Free tier | $0 |
+| Feature                         | Cost per request | At 1,000/day |
+| ------------------------------- | ---------------- | ------------ |
+| Image analysis (food + recipes) | ~$0.003          | ~$3/day      |
+| URL recipe extraction (YouTube) | ~$0.01           | ~$10/day     |
+| URL recipe extraction (webpage) | ~$0.005          | ~$5/day      |
+| Content moderation              | Free tier        | $0           |
 
-## Available Scripts
-
-Run from the `functions/` directory:
+See [docs/cost-estimation.md](docs/cost-estimation.md) for detailed cost
+breakdowns.
 
 | Command                | Description                                  |
 | ---------------------- | -------------------------------------------- |
@@ -271,8 +304,16 @@ gsutil cors set storage-cors.json gs://YOUR-PROJECT-ID.firebasestorage.app
 ## Documentation
 
 - [Local Development Setup](docs/local-setup.md)
+- [Environment & Secrets Setup](docs/environment-setup.md)
+- [Infrastructure Setup Guide](docs/infra-setup.md)
+- [Deployment Guide](docs/deployment.md)
+- [System Architecture](docs/architecture.md)
 - [Recipe Recommendations (Image)](docs/recipe-recommendations.md)
 - [URL Recipe Extraction](docs/url-recipe-extraction.md)
+- [Redis Caching & Deduplication](docs/caching.md)
+- [Cost Estimation](docs/cost-estimation.md)
+- [Security Improvements](docs/security-improvements.md)
+- [Frontend RevenueCat Integration](functions/docs/FRONTEND_REVENUECAT_INTEGRATION.md)
 
 ## License
 
