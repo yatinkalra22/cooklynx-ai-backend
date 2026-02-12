@@ -9,6 +9,7 @@ const allowedOrigins = [
   "https://cooklynx-ai.firebaseapp.com",
   "https://cooklynx-ai.web.app",
   "https://cooklynx-ai.vercel.app",
+  "https://cooklynx-ai-app.vercel.app",
 
   // Development origins
   "http://localhost:3000",
