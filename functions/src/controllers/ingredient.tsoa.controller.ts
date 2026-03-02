@@ -69,6 +69,33 @@ export class IngredientController extends Controller {
       };
     }
 
+    // Pre-clean: filter obvious junk before sending to AI
+    const cleaned = trimmed
+      .split(",")
+      .map((s) => s.trim())
+      .filter((s) => {
+        if (!s || s.length < 2) return false; // too short
+        if (/^\d+$/.test(s)) return false; // only numbers
+        if (/^(.)\1+$/.test(s)) return false; // repeated single char ("aaa")
+        return true;
+      })
+      // Deduplicate (case-insensitive)
+      .filter(
+        (s, i, arr) =>
+          arr.findIndex((x) => x.toLowerCase() === s.toLowerCase()) === i
+      );
+
+    if (cleaned.length === 0) {
+      this.setStatus(400);
+      throw {
+        error: "Bad Request",
+        message:
+          "No valid ingredients found. Please enter real food items separated by commas.",
+      };
+    }
+
+    const cleanedInput = cleaned.join(", ");
+
     // Reserve credits atomically
     let creditsRemaining = 0;
     try {
@@ -97,15 +124,19 @@ export class IngredientController extends Controller {
 
       // Analyze ingredients with AI (synchronous — text-only is fast)
       const analysis = await AIService.analyzeCustomIngredients(
-        trimmed,
+        cleanedInput,
         userPreferences
       );
+
+      // Store cleaned input derived from AI items (corrected spelling, no junk)
+      const aiCleanedInput =
+        analysis.items.map((item) => item.name).join(", ") || cleanedInput;
 
       // Store result in RTDB
       const record: CustomIngredientAnalysis = {
         ingredientId,
         userId: user.uid,
-        rawInput: trimmed,
+        rawInput: aiCleanedInput,
         items: analysis.items,
         summary: analysis.summary,
         recommendations: analysis.recommendations,

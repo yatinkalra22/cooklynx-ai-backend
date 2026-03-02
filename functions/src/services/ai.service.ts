@@ -257,8 +257,15 @@ The user has listed these ingredients they have on hand: "${rawInput}"
 
 **TASK 1: Clean & Identify Ingredients**
 Parse the comma-separated list above into structured ingredient items.
-For each item:
-1. "name": Cleaned, proper name of the ingredient
+
+IMPORTANT cleaning rules:
+- Fix misspellings and typos (e.g. "potataoooo" → "Potato", "cheeeeze" → "Cheese", "snakeee" → discard if not a real food)
+- SKIP any entry that is not a recognizable real food ingredient (e.g. "abc", "asdf", "test", random letters/numbers)
+- Normalize names to proper English (capitalize, singular or common form)
+- Only include items that are actual food ingredients a person could cook with
+
+For each valid item:
+1. "name": Cleaned, corrected, proper name of the ingredient
 2. "category": Category (e.g., Produce, Dairy, Meat, Pantry, Grain, Spice, etc.)
 3. "notes": Brief notes (e.g., common uses, storage tips, or preparation suggestions)
 4. "confidence": Set to 1.0 since these are user-provided

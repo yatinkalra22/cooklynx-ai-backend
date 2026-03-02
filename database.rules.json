@@ -23,6 +23,9 @@
     "urlRecipes": {
       ".indexOn": ["userId"]
     },
+    "customIngredients": {
+      ".indexOn": ["userId"]
+    },
     "sharedUrlRecipes": {
       ".read": "auth != null",
       ".indexOn": ["normalizedUrl"]

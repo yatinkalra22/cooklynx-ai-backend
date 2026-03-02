@@ -442,7 +442,7 @@ export interface ParseIngredientsRequest {
 export interface ParseIngredientsResponse {
   message: string;
   ingredientId: string;
-  status: "completed";
+  status: "pending" | "completed";
   creditsUsed: number;
   creditsRemaining: number;
 }
@@ -466,7 +466,7 @@ export interface CustomIngredientAnalysis {
  * Response for fetching a custom ingredient analysis
  */
 export interface GetIngredientAnalysisResponse {
-  status: "completed" | "failed";
+  status: "pending" | "completed" | "failed";
   analysis?: CustomIngredientAnalysis;
   error?: string;
   message?: string;
