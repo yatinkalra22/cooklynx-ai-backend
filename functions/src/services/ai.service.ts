@@ -195,7 +195,9 @@ Be STRICT about safety. When in doubt, mark as unsafe. CSAM detection must have 
   static async analyzeCustomIngredients(
     rawInput: string,
     userPreferences?: UserFoodPreferences | null
-  ): Promise<Omit<CustomIngredientAnalysis, "ingredientId" | "userId" | "createdAt">> {
+  ): Promise<
+    Omit<CustomIngredientAnalysis, "ingredientId" | "userId" | "createdAt">
+  > {
     const prompt = this.buildCustomIngredientPrompt(rawInput, userPreferences);
 
     const requestGeminiAnalysis = () =>
@@ -259,8 +261,10 @@ The user has listed these ingredients they have on hand: "${rawInput}"
 Parse the comma-separated list above into structured ingredient items.
 
 IMPORTANT cleaning rules:
-- Fix misspellings and typos (e.g. "potataoooo" → "Potato", "cheeeeze" → "Cheese", "snakeee" → discard if not a real food)
-- SKIP any entry that is not a recognizable real food ingredient (e.g. "abc", "asdf", "test", random letters/numbers)
+- Fix misspellings and typos (e.g. "potataoooo" →
+  "Potato", "cheeeeze" → "Cheese", "snakeee" → discard if not a real food)
+- SKIP any entry that is not a recognizable real food ingredient (e.g. "abc",
+"asdf", "test", random letters/numbers)
 - Normalize names to proper English (capitalize, singular or common form)
 - Only include items that are actual food ingredients a person could cook with
 
