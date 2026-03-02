@@ -1,6 +1,6 @@
 import {geminiModel, geminiModerationModel} from "../config/firebase.config";
 import {StorageService} from "./storage.service";
-import {FoodAnalysis} from "../types/api.types";
+import {FoodAnalysis, CustomIngredientAnalysis} from "../types/api.types";
 import {UserFoodPreferences} from "../types/preference.types";
 import * as logger from "firebase-functions/logger";
 
@@ -185,6 +185,129 @@ Be STRICT about safety. When in doubt, mark as unsafe. CSAM detection must have 
     const analysis = this.parseFoodAIResponse(text, includeRecommendations);
 
     return analysis;
+  }
+
+  /**
+   * Analyze custom ingredients (text-only, no image)
+   * Takes a raw comma-separated ingredient list, cleans it up,
+   * and generates structured ingredients + recipe recommendations.
+   */
+  static async analyzeCustomIngredients(
+    rawInput: string,
+    userPreferences?: UserFoodPreferences | null
+  ): Promise<Omit<CustomIngredientAnalysis, "ingredientId" | "userId" | "createdAt">> {
+    const prompt = this.buildCustomIngredientPrompt(rawInput, userPreferences);
+
+    const requestGeminiAnalysis = () =>
+      geminiModel.generateContent([{text: prompt}]);
+
+    const result =
+      process.env.GEMINI_ENABLE_RETRY === "true"
+        ? await this.withGeminiRetry(requestGeminiAnalysis)
+        : await requestGeminiAnalysis();
+
+    const response = await result.response;
+    const text = response.text();
+
+    const analysis = this.parseFoodAIResponse(text, true);
+
+    return {
+      rawInput,
+      items: analysis.items,
+      summary: analysis.summary,
+      recommendations: analysis.recommendations,
+      analyzedAt: analysis.analyzedAt,
+      version: "1.0",
+    };
+  }
+
+  /**
+   * Build prompt for custom ingredient analysis (text-only)
+   */
+  private static buildCustomIngredientPrompt(
+    rawInput: string,
+    userPreferences?: UserFoodPreferences | null
+  ): string {
+    const hasPreferences = userPreferences?.cuisines?.length;
+    const totalRecommendations = hasPreferences ? 5 : 3;
+    const personalizedCount = hasPreferences ? 3 : 0;
+    const randomCount = hasPreferences ? 2 : 3;
+
+    let personalizationInstructions = "";
+    if (hasPreferences) {
+      const cuisineList = userPreferences.cuisines.join(", ");
+      const dietaryInfo =
+        userPreferences.dietary && userPreferences.dietary.length > 0
+          ? ` The user follows these dietary preferences: ${userPreferences.dietary.join(", ")}.`
+          : "";
+
+      personalizationInstructions = `
+
+**PERSONALIZATION:**
+The user prefers ${cuisineList} cuisine(s).${dietaryInfo}
+
+- Generate ${personalizedCount} recipes that match their cuisine preferences
+- Generate ${randomCount} additional diverse recipes from other cuisines
+- Clearly mark which recipes are personalized vs. random in the "type" field
+- Ensure ALL recommendations respect their dietary preferences${dietaryInfo ? " (if specified)" : ""}`;
+    }
+
+    return `You are an expert culinary assistant and nutritionist.
+The user has listed these ingredients they have on hand: "${rawInput}"
+
+**TASK 1: Clean & Identify Ingredients**
+Parse the comma-separated list above into structured ingredient items.
+For each item:
+1. "name": Cleaned, proper name of the ingredient
+2. "category": Category (e.g., Produce, Dairy, Meat, Pantry, Grain, Spice, etc.)
+3. "notes": Brief notes (e.g., common uses, storage tips, or preparation suggestions)
+4. "confidence": Set to 1.0 since these are user-provided
+
+**TASK 2: Recommend Recipes**
+Based on the listed ingredients, recommend ${totalRecommendations} creative and
+delicious dishes that can be prepared.${personalizationInstructions}
+
+For each dish, provide:
+1. "name": Name of the dish
+2. "description": A brief, appetizing description
+3. "ingredientsUsed": Which of the listed ingredients are used
+4. "additionalIngredientsNeeded": Any common pantry staples or minor ingredients needed
+5. "cookingTime": Estimated time to prepare and cook
+6. "difficulty": Difficulty level ("easy", "medium", or "hard")
+7. "instructions": Step-by-step cooking instructions (array of strings)
+8. "type": "personalized" or "random"
+
+Return ONLY a valid JSON object (no markdown, no explanations).
+
+**Response format (JSON only):**
+{
+  "items": [
+    {
+      "name": "Chicken Breast",
+      "category": "Meat",
+      "notes": "Versatile protein, great grilled or baked",
+      "confidence": 1.0
+    }
+  ],
+  "summary": "Short 1-2 sentence overview of the ingredients and meal potential",
+  "recommendations": {
+    "recommendations": [
+      {
+        "name": "Dish Name",
+        "description": "Appetizing description...",
+        "ingredientsUsed": ["Chicken Breast"],
+        "additionalIngredientsNeeded": ["salt", "oil"],
+        "cookingTime": "25 mins",
+        "difficulty": "easy",
+        "instructions": ["Step 1...", "Step 2..."],
+        "type": "random"
+      }
+    ],
+    "summary": "Quick overview of the recommended meals"
+  }
+}
+
+Be precise and helpful. Return ONLY valid JSON.`;
   }
 
   /**

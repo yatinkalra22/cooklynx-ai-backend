@@ -65,6 +65,8 @@ export const CACHE_KEYS = {
   urlExtractionList: (userId: string) => `user:${userId}:urlextractions`,
   urlRecipe: (urlId: string) => `urlrecipe:${urlId}`,
   urlHash: (hash: string) => `urlhash:${hash}`,
+  // Custom ingredient cache keys
+  customIngredient: (ingredientId: string) => `customing:${ingredientId}`,
 } as const;
 
 /**

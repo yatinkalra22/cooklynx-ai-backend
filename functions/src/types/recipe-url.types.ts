@@ -3,6 +3,8 @@
  * Types for extracting recipes from video URLs (YouTube, Instagram, TikTok, etc.)
  */
 
+import {CustomIngredientAnalysis} from "./api.types";
+
 // ============================================================================
 // Status & Platform Types
 // ============================================================================
@@ -252,6 +254,7 @@ export interface CombinedAssetsResponse {
     metadata: UrlExtractionMetadata;
     recipe?: UrlRecipeResult;
   }>;
+  customIngredients: CustomIngredientAnalysis[];
 }
 
 // ============================================================================

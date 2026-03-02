@@ -39,6 +39,10 @@
         "description": "Subscription management and credit usage"
       },
       {
+        "name": "Ingredients",
+        "description": "Custom ingredient parsing and recipe generation"
+      },
+      {
         "name": "Webhooks",
         "description": "Third-party webhook handlers"
       }

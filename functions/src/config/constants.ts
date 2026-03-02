@@ -44,6 +44,9 @@ export const PRO_MAX_CREDIT_LIMIT = 500;
 // Credits consumed per image analysis
 export const IMAGE_CREDIT_COST = 1;
 
+// Credits consumed per custom ingredient parsing
+export const INGREDIENT_CREDIT_COST = 1;
+
 // ============================================================================
 // Food Preferences
 // ============================================================================

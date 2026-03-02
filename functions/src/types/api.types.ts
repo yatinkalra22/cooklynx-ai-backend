@@ -199,9 +199,11 @@ export type CreditTransactionType =
   | "image_analysis"
   | "image_fix"
   | "url_recipe_extraction"
+  | "ingredient_parsing"
   | "image_analysis_refund"
   | "image_fix_refund"
   | "url_recipe_extraction_refund"
+  | "ingredient_parsing_refund"
   | "subscription_credit_reset"
   | "subscription_upgrade_bonus";
 
@@ -421,3 +423,51 @@ export type AnalysisResponse =
   | AnalysisProcessingResponse
   | AnalysisCompletedResponse
   | AnalysisFailedResponse;
+
+// ============================================================================
+// Custom Ingredient Types
+// ============================================================================
+
+/**
+ * Request body for parsing custom ingredients
+ */
+export interface ParseIngredientsRequest {
+  /** Comma-separated list of ingredients */
+  ingredients: string;
+}
+
+/**
+ * Response after parsing custom ingredients
+ */
+export interface ParseIngredientsResponse {
+  message: string;
+  ingredientId: string;
+  status: "completed";
+  creditsUsed: number;
+  creditsRemaining: number;
+}
+
+/**
+ * Stored custom ingredient analysis
+ */
+export interface CustomIngredientAnalysis {
+  ingredientId: string;
+  userId: string;
+  rawInput: string;
+  items: Ingredient[];
+  summary: string;
+  recommendations?: RecipeRecommendationResponse;
+  analyzedAt: string;
+  version: string;
+  createdAt: string;
+}
+
+/**
+ * Response for fetching a custom ingredient analysis
+ */
+export interface GetIngredientAnalysisResponse {
+  status: "completed" | "failed";
+  analysis?: CustomIngredientAnalysis;
+  error?: string;
+  message?: string;
+}

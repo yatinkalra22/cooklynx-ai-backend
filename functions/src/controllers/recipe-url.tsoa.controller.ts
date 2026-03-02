@@ -27,7 +27,7 @@ import {
   VideoPlatform,
 } from "../types/recipe-url.types";
 import {GEMINI_MODELS} from "../types/gemini.types";
-import {ErrorResponse} from "../types/api.types";
+import {ErrorResponse, CustomIngredientAnalysis} from "../types/api.types";
 import {AuthUser} from "../middleware/tsoa-auth.middleware";
 import * as logger from "firebase-functions/logger";
 import {database} from "../config/firebase.config";
@@ -452,11 +452,17 @@ export class RecipeUrlController extends Controller {
     const user = request.user;
 
     try {
-      // Fetch both images and URL extractions in parallel
-      const [imagesSnapshot, urlExtractions] = await Promise.all([
-        database.ref("images").orderByChild("userId").equalTo(user.uid).get(),
-        UrlRecipeService.listExtractions(user.uid),
-      ]);
+      // Fetch images, URL extractions, and custom ingredients in parallel
+      const [imagesSnapshot, urlExtractions, customIngredientsSnapshot] =
+        await Promise.all([
+          database.ref("images").orderByChild("userId").equalTo(user.uid).get(),
+          UrlRecipeService.listExtractions(user.uid),
+          database
+            .ref("customIngredients")
+            .orderByChild("userId")
+            .equalTo(user.uid)
+            .get(),
+        ]);
 
       // Collect raw image data
       const rawImages: Array<{
@@ -520,9 +526,26 @@ export class RecipeUrlController extends Controller {
         })
       );
 
+      // Collect custom ingredients
+      const customIngredients: CustomIngredientAnalysis[] = [];
+      if (customIngredientsSnapshot.exists()) {
+        customIngredientsSnapshot.forEach((child) => {
+          const value = child.val();
+          if (!value || typeof value !== "object") return;
+          customIngredients.push(value as CustomIngredientAnalysis);
+        });
+      }
+
+      // Sort custom ingredients newest first (by createdAt)
+      customIngredients.sort(
+        (a, b) =>
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      );
+
       const result: CombinedAssetsResponse = {
         images,
         urlExtractions,
+        customIngredients,
       };
 
       return result;
