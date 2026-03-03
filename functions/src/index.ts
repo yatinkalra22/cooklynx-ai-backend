@@ -27,6 +27,27 @@ import {
 } from "./config/env-validation";
 import {redactSensitiveData} from "./utils/validation.utils";
 
+function buildSwaggerDocumentForRequest(
+  req: Request,
+  baseDoc: Record<string, unknown>
+): Record<string, unknown> {
+  const host = req.get("host") || "";
+  const functionTarget = process.env.FUNCTION_TARGET || "api";
+  const isCloudFunctionsHost = host.endsWith(".cloudfunctions.net");
+  const basePath = isCloudFunctionsHost ? `/${functionTarget}` : "";
+  const runtimeServerUrl = `${req.protocol}://${host}${basePath}`;
+
+  return {
+    ...baseDoc,
+    servers: [
+      {
+        url: runtimeServerUrl,
+        description: "Current deployment",
+      },
+    ],
+  };
+}
+
 // Validate environment variables on startup
 try {
   validateRequiredEnvironment();
@@ -164,8 +185,20 @@ try {
 
 if (swaggerDocument) {
   // OpenAPI JSON spec
-  app.get("/docs.json", (_req, res) => res.json(swaggerDocument));
-  app.get("/swagger.json", (_req, res) => res.json(swaggerDocument));
+  app.get("/docs.json", (req, res) => {
+    const runtimeDoc = buildSwaggerDocumentForRequest(
+      req,
+      swaggerDocument as Record<string, unknown>
+    );
+    res.json(runtimeDoc);
+  });
+  app.get("/swagger.json", (req, res) => {
+    const runtimeDoc = buildSwaggerDocumentForRequest(
+      req,
+      swaggerDocument as Record<string, unknown>
+    );
+    res.json(runtimeDoc);
+  });
   app.get("/swagger", (_req, res) => {
     res.send(`<!DOCTYPE html>
 <html>

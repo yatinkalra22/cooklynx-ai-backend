@@ -19,12 +19,23 @@ const allowedOrigins = [
   "http://10.0.2.2:8081",
 ];
 
+// Pattern-based origins for dynamic preview/deployment URLs
+const allowedOriginPatterns: RegExp[] = [
+  /^https:\/\/([a-z0-9-]+\.)?vercel\.app$/i,
+  /^https:\/\/us-central1-[a-z0-9-]+\.cloudfunctions\.net$/i,
+  /^https:\/\/[a-z0-9-]+-uc\.a\.run\.app$/i,
+];
+
 // Add additional origins from environment variable
 if (process.env.ALLOWED_ORIGINS) {
   const envOrigins = process.env.ALLOWED_ORIGINS.split(",").map((o) =>
     o.trim()
   );
   allowedOrigins.push(...envOrigins);
+}
+
+if (process.env.APP_URL) {
+  allowedOrigins.push(process.env.APP_URL.trim());
 }
 
 // Allow emulator origins in development
@@ -45,18 +56,24 @@ export const corsOptions = {
 
     if (allowedOrigins.indexOf(origin) !== -1) {
       callback(null, true);
+    } else if (allowedOriginPatterns.some((pattern) => pattern.test(origin))) {
+      callback(null, true);
     } else {
       logger.warn("CORS blocked request from origin:", origin);
       callback(new Error("Not allowed by CORS"));
     }
   },
   credentials: true, // Allow cookies
-  methods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
+  methods: ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
   allowedHeaders: [
     "Content-Type",
+    "Accept",
+    "Origin",
     "Authorization",
+    "X-Requested-With",
     "x-request-id",
     "x-skip-cache",
+    "x-client-version",
   ],
   exposedHeaders: ["x-request-id", "RateLimit-Limit", "RateLimit-Remaining"],
   maxAge: 600, // Preflight cache 10 minutes
