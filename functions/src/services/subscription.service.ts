@@ -209,10 +209,22 @@ export class SubscriptionService {
 
       activeEntitlements.push(`${entId}(${entData.product_identifier})`);
 
-      // Try mapping by entitlement ID first, then by product ID
-      let plan = ENTITLEMENT_TO_PLAN[entId];
-      if (!plan && entData.product_identifier) {
-        plan = PRODUCT_TO_PLAN[entData.product_identifier];
+      // Resolve plan from both entitlement ID and product ID,
+      // then pick whichever has higher priority. This handles cases
+      // where a single entitlement (e.g. "pro") is shared across
+      // multiple products — the product ID breaks the tie.
+      const planFromEntitlement = ENTITLEMENT_TO_PLAN[entId] ?? null;
+      const planFromProduct = entData.product_identifier
+        ? (PRODUCT_TO_PLAN[entData.product_identifier] ?? null)
+        : null;
+
+      let plan: SubscriptionPlan | null = null;
+      if (planFromEntitlement && planFromProduct) {
+        plan = PLAN_PRIORITY[planFromProduct] > PLAN_PRIORITY[planFromEntitlement]
+          ? planFromProduct
+          : planFromEntitlement;
+      } else {
+        plan = planFromProduct ?? planFromEntitlement;
       }
 
       if (!plan) {
