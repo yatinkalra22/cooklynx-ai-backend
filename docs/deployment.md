@@ -10,20 +10,19 @@ Complete guide for deploying CookLynx AI backend to Firebase Cloud Functions.
   - Cloud Functions enabled
   - Cloud Storage enabled
   - Authentication enabled
-  - Realtime Database enabled (or Firestore)
-  - **Cloud Pub/Sub enabled** (for video processing)
+  - Realtime Database enabled
+  - **Cloud Pub/Sub enabled** (for async URL recipe extraction)
 
 ## Pre-Deployment Setup
 
 ### 1. Enable Required GCP Services
 
 ```bash
-# Enable Cloud Pub/Sub for video processing
+# Enable Cloud Pub/Sub for async processing
 gcloud services enable pubsub.googleapis.com
 
-# Create Pub/Sub topics for async processing
-gcloud pubsub topics create video-analysis-queue
-gcloud pubsub topics create video-fix-queue
+# Create Pub/Sub topic for URL recipe extraction
+gcloud pubsub topics create url-recipe-extraction
 ```
 
 ### 2. Configure Environment Variables
@@ -102,8 +101,7 @@ firebase functions:list
 You should see these functions in the `us-central1` region:
 
 - `api` - Main HTTP API
-- `videoAnalysisWorker` - Pub/Sub triggered video analysis processor
-- `videoFixWorker` - Pub/Sub triggered video fix processor
+- `urlRecipeExtractionWorker` - Pub/Sub triggered URL recipe extraction
 
 ### 2. Test Endpoints
 
@@ -380,8 +378,7 @@ gcloud functions deploy api \
 - ✅ Storage CORS configured for direct downloads (storage-cors.json)
 - ✅ Firebase Auth required for protected endpoints
 - ✅ Input validation via tsoa
-- ✅ File upload limits enforced (images: 10MB, videos: 50MB)
-- ✅ Video duration limit enforced (60 seconds max)
+- ✅ File upload limits enforced (images: 10MB)
 - ✅ AI content moderation on all uploads
 
 See [docs/architecture.md](./architecture.md) for security details.

@@ -12,7 +12,7 @@ Before deploying, ensure these Google Cloud services are enabled:
 | Cloud Functions   | API hosting                 | Auto-enabled with Firebase                         |
 | Cloud Storage     | File storage                | Auto-enabled with Firebase                         |
 | Realtime Database | Metadata storage            | Auto-enabled with Firebase                         |
-| Cloud Pub/Sub     | URL recipe extraction queue | Enable in GCP Console                              |
+| Cloud Pub/Sub     | Async URL recipe extraction | Enable in GCP Console                              |
 | Secret Manager    | Store API keys              | Auto-enabled with `firebase functions:secrets:set` |
 
 ### Enable Cloud Pub/Sub

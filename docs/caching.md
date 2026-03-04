@@ -118,16 +118,6 @@
 
 ---
 
-4. Check DB for Get cached fixId, completed fix return result with same sig (NO
-   AI call!) │ ├──── FOUND ────────┐ │ │ ▼ ▼
-5. NEW FIX: Reuse existing
-   - Call Gemini fix result image gen (NO AI call!)
-   - Upload result
-   - Cache result
-   - Cache signature
-
-````
-
 ## Redis Key Schema
 
 | Key Pattern | Description | TTL | Example |

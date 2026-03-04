@@ -25,19 +25,19 @@ Future fetches return cached data (no AI calls)
 
 - AI Call 1: Analyze image → detect ingredients (2-3s)
 - AI Call 2: Generate recipes from ingredients (2-3s)
-- **Total: 5-6s, 2 AI calls, ~$0.30 per analysis**
+- **Total: 5-6s, 2 AI calls, ~$0.006 per analysis**
 
 **AFTER (1 AI call)**:
 
 - AI Call 1: Analyze image + generate recipes together (3-4s)
-- **Total: 3-4s, 1 AI call, ~$0.15 per analysis**
+- **Total: 3-4s, 1 AI call, ~$0.003 per analysis**
 
 **Savings**:
 
-- 🚀 **50% fewer AI calls**
-- 💰 **50% cost reduction**
-- ⚡ **40% faster response**
-- 📉 **Lower token usage**
+- 50% fewer AI calls
+- 50% cost reduction
+- ~40% faster response
+- Lower token usage
 
 ## Database Schema
 
@@ -158,11 +158,11 @@ const analysis = analysisSnapshot.val();
 
 | Metric            | Old Approach (2 calls) | New Approach (1 call) | Improvement        |
 | ----------------- | ---------------------- | --------------------- | ------------------ |
-| First Analysis    | 5-6s                   | 3-4s                  | **40% faster**     |
-| AI Calls          | 2                      | 1                     | **50% reduction**  |
-| Cost per Analysis | ~$0.30                 | ~$0.15                | **50% savings**    |
-| Cached Retrieval  | <100ms                 | <100ms                | Same               |
-| Token Usage       | High                   | Medium                | **~40% reduction** |
+| First Analysis    | 5-6s                   | 3-4s                  | ~40% faster     |
+| AI Calls          | 2                      | 1                     | 50% reduction   |
+| Cost per Analysis | ~$0.006                | ~$0.003               | 50% savings     |
+| Cached Retrieval  | <100ms                 | <100ms                | Same            |
+| Token Usage       | High                   | Medium                | ~40% reduction  |
 
 ### Cost Breakdown
 
@@ -174,9 +174,9 @@ const analysis = analysisSnapshot.val();
 
 **Example: 1000 images/day**:
 
-- Combined calls: 1000 × $0.15 = $150/day
-- If recipes were separate: 1000 × $0.30 = $300/day
-- **Monthly savings: $4,500 (50% reduction) 💰**
+- Combined calls: 1000 x $0.003 = $3/day
+- If recipes were separate: 1000 x $0.006 = $6/day
+- **Monthly savings: ~$90 (50% reduction)**
 
 ## Optional Recommendations
 

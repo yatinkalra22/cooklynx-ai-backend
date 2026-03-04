@@ -33,25 +33,6 @@ exec -l $SHELL
 gcloud --version
 ```
 
-### Install Terraform
-
-```bash
-# macOS
-brew install terraform
-
-# Linux
-wget https://releases.hashicorp.com/terraform/1.6.0/terraform_1.6.0_linux_amd64.zip
-unzip terraform_1.6.0_linux_amd64.zip
-sudo mv terraform /usr/local/bin/
-
-# Windows (use Chocolatey)
-choco install terraform
-
-# Verify
-terraform --version
-# Should show: Terraform v1.6.0 or higher
-```
-
 ## Step 2: Create Firebase Project (5 minutes)
 
 ### 2.1 Login to Firebase

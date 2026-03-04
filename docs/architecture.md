@@ -2,6 +2,8 @@
 
 ## System Overview
 
+![Top-Level Architecture](../assets/images/top-level.png)
+
 ```
 Clients (Mobile App / Web App)
     │
@@ -30,7 +32,7 @@ Clients (Mobile App / Web App)
 │                                              │
 │  ┌──────────────────────────────────────┐    │
 │  │ urlRecipeExtractionWorker (Pub/Sub)  │    │
-│  │ 2 GiB RAM · 9 min timeout           │    │
+│  │ 1 GiB RAM · 5 min timeout           │    │
 │  │ Subscribes: url-recipe-extraction    │    │
 │  └──────────────────────────────────────┘    │
 └──────────────────────────────────────────────┘
@@ -55,7 +57,7 @@ Clients (Mobile App / Web App)
 | Function                    | Trigger | Memory | Timeout | Max Instances | Purpose                        |
 | --------------------------- | ------- | ------ | ------- | ------------- | ------------------------------ |
 | `api`                       | HTTP    | 1 GiB  | 300s    | 10            | Main REST API (Express + tsoa) |
-| `urlRecipeExtractionWorker` | Pub/Sub | 2 GiB  | 540s    | 5             | Async URL recipe extraction    |
+| `urlRecipeExtractionWorker` | Pub/Sub | 1 GiB  | 300s    | 10            | Async URL recipe extraction    |
 
 ---
 
@@ -82,6 +84,8 @@ Clients (Mobile App / Web App)
 | ImageController        | `/v1/images`                                  | Upload image, get analysis, list images, signed URLs               |
 | RecipeUrlController    | `/v1/recipes`                                 | Extract recipes from URLs, get extraction status                   |
 | PreferenceController   | `/v1/food-preferences` `/v1/user/preferences` | Manage user food preferences                                       |
+| GroceryController      | `/v1/grocery`                                 | Grocery list operations                                            |
+| IngredientController   | `/v1/ingredients`                             | Ingredient operations                                              |
 | SubscriptionController | `/v1/subscription`                            | RevenueCat subscription management                                 |
 | WebhookController      | `/v1/webhooks`                                | RevenueCat webhook handling                                        |
 | AssetController        | `/v1/assets`                                  | Unified list of all images                                         |
@@ -94,6 +98,8 @@ docs auto-generated at `/swagger`.
 ## Request Flows
 
 ### Image Upload + Analysis (Synchronous)
+
+![Image Upload Sequence Diagram](../assets/images/detaill.png)
 
 ```
 Client                     api Cloud Function                 Cloud Storage    Gemini AI        RTDB
@@ -160,42 +166,6 @@ Client              api Cloud Function      Pub/Sub          urlRecipeWorker    
 
 ---
 
-│ │ │ │ │ │ │ │ │ │ ├── Upload frames ───►│ │ │ │ │ │ │ │ │ │ │ │ │ ├── Moderate
-frames (batch 4)───────►│ │ │ │ │ │ (Gemini 2.0 Flash)│ │ │ │ │ │ │ │ │ │ │ │ │
-├── Analyze video ───────────────────►│ │ │ │ │ │ (Gemini 3 Flash Preview) │ │ │
-│ │ │ Sends whole video inline │ │ │ │ │ │ │ │ │ │ │ │ ├── Extract problem
-frames at exact timestamps │ │ │ │ │ │ │ │ │ │ │ ├── Save analysis
-───────────────────────────────►│ │ │ │ │ + cache in Redis │ │ │ │ │ │ │ │ │ │
-├── GET /videos/{id}/analysis ► poll
-(queued→extracting→moderating→analyzing→aggregating→completed) ──►│
-
-```
-
-### Video Fix (Pub/Sub Async)
-
-```
-
-Client api Cloud Function Pub/Sub videoFixWorker Cloud Storage Gemini AI RTDB │
-│ │ │ │ │ │ ├── POST /videos/{id}/fixes►│ │ │ │ │ │ │ {fixScope, problemIds} │ │
-│ │ │ │ │ │ │ │ │ │ │ │ ├──
-reserveCredits()─┼─────────────────────┼─────────────────────┼──────────────┼────────────►│
-│ │ (2 credits) │ │ │ │ │ │ │ │ │ │ │ │ │ ├── Dedup: fix signature check │ │ │ │
-│ │ │ │ │ │ │ │ ├── Create fix job
-──┼─────────────────────┼─────────────────────┼──────────────┼────────────►│ │ │
-│ │ │ │ │ │ ├── Publish ────────►│ video-fix-queue │ │ │ │ │ │ {fixId, videoId}
-│ │ │ │ │ │ │ │ │ │ │ │ │◄── 201 {fixId} ──────┤ │ │ │ │ │ │ │ ├── Trigger
-─────────►│ │ │ │ │ │ │ │ │ │ │ │ │ │ ├── For each target frame: │ │ │ │ │ │
-Download frame ──►│ │ │ │ │ │ │ │ │ │ │ │ │ │ generateFixedImage()────────────►│
-│ │ │ │ │ (Gemini 3 Pro Image Preview) │ │ │ │ │ │ Fallback:
-generateFixPlan()──────►│ │ │ │ │ │ │ │ │ │ │ │ │ Upload fixed frame►│ │ │ │ │ │
-│ │ │ │ │ │ │ ├── Save result ─────────────────────────────────►│ │ │ │ │ │ │ │
-├── GET /videos/{id}/fixes/{fixId} ► poll until completed
-────────────────────────────────────────────►│
-
-```
-
----
-
 ## Subscription & Credit System
 
 The app uses **RevenueCat** for subscription management with three tiers:
@@ -233,17 +203,40 @@ The app uses **RevenueCat** for subscription management with three tiers:
 
 ### Multi-Layer Security
 
+![Security Architecture](../assets/images/security.png)
+
 ```
-
-Client (Mobile / Web) │ [1. Firebase Auth Token in Authorization header] ▼ Cloud
-Functions (api) │ [2. Helmet: security headers (CSP, HSTS, X-Frame-Options,
-etc.)] │ [3. CORS: whitelist of allowed origins] │ [4. Rate limiter: strict on
-auth, moderate on API] │ [5. tsoa auth middleware: validate Firebase JWT] │ [6.
-Session verification: device fingerprint check] │ [7. Extract userId from token]
-▼ Controller │ [8. Resource ownership check (userId match)] │ [9.
-Subscription/credit verification] ▼ Service Layer │ [10. Content moderation
-(Gemini 2.0 Flash)] │ [11. Input validation & sanitization] ▼ Database / Storage
-
+Client (Mobile / Web)
+    │
+    [1. Firebase Auth Token in Authorization header]
+    ▼
+Cloud Functions (api)
+    │
+    [2. Helmet: security headers (CSP, HSTS, X-Frame-Options, etc.)]
+    │
+    [3. CORS: whitelist of allowed origins]
+    │
+    [4. Rate limiter: strict on auth, moderate on API]
+    │
+    [5. tsoa auth middleware: validate Firebase JWT]
+    │
+    [6. Session verification: device fingerprint check]
+    │
+    [7. Extract userId from token]
+    ▼
+Controller
+    │
+    [8. Resource ownership check (userId match)]
+    │
+    [9. Subscription/credit verification]
+    ▼
+Service Layer
+    │
+    [10. Content moderation (Gemini 2.0 Flash)]
+    │
+    [11. Input validation & sanitization]
+    ▼
+Database / Storage
 ```
 
 ### Session Management
@@ -270,51 +263,79 @@ Violations are tracked per user. After **3 violations**, the account is permanen
 ## Database Schema (Firebase Realtime Database)
 
 ```
+/users/{userId}
+  ├── displayName, email, emailVerified, photoURL, createdAt
+  ├── totalPhotos, totalPhotoCompleted, totalPhotoFailed
+  ├── subscription/
+  │     ├── plan: "free" | "pro" | "premium"
+  │     ├── status: "active" | "expired" | "cancelled"
+  │     ├── credits: number                    # For free plan
+  │     ├── creditLimit: number                # Max for free plan (20)
+  │     ├── creditsUsedThisMonth: number       # For paid plans
+  │     ├── monthlyLimit: number               # For paid plans (100 or -1)
+  │     ├── expiresAt?: string
+  │     ├── lastSyncedAt?: string
+  │     └── revenueCatCustomerId?: string
+  ├── creditLedger/
+  │     └── {pushId}: { type, amount, resourceId, timestamp, creditAfter }
+  ├── sessions/
+  │     └── {sessionId}: { createdAt, lastSeenAt, deviceFingerprint, ipAddress, userAgent }
+  └── contentViolations/
+        ├── count: number
+        ├── blocked: boolean
+        ├── blockedAt?: string
+        └── history/
+              └── {pushId}: { category, timestamp, resourceId }
 
-/users/{userId} ├── displayName, email, emailVerified, photoURL, createdAt ├──
-totalPhotos, totalPhotoCompleted, totalPhotoFailed ├── subscription/ │ ├── plan:
-"free" | "pro" | "premium" │ ├── status: "active" | "expired" | "cancelled" │
-├── credits: number # For free plan │ ├── creditLimit: number # Max for free
-plan (20) │ ├── creditsUsedThisMonth: number # For paid plans │ ├──
-monthlyLimit: number # For paid plans (100 or -1) │ ├── expiresAt?: string │ ├──
-lastSyncedAt?: string │ └── revenueCatCustomerId?: string ├── creditLedger/ │
-└── {pushId}: { type, amount, resourceId, timestamp, creditAfter } ├── sessions/
-│ └── {sessionId}: { createdAt, lastSeenAt, deviceFingerprint, ipAddress,
-userAgent } └── contentViolations/ ├── count: number ├── blocked: boolean ├──
-blockedAt?: string └── history/ └── {pushId}: { category, timestamp, resourceId
-}
+/preferences/{userId}
+  ├── cuisines: CuisineType[]
+  ├── dietary: DietaryPreference[]
+  ├── allergens: string[]
+  ├── createdAt: string
+  ├── updatedAt: string
+  └── isFirstTime: boolean
 
-/preferences/{userId} ├── cuisines: CuisineType[] ├── dietary:
-DietaryPreference[] ├── allergens: string[] ├── createdAt: string ├── updatedAt:
-string └── isFirstTime: boolean
+/images/{imageId}
+  ├── imageId, userId, storagePath, originalName, mimeType, size
+  ├── width, height, uploadedAt
+  ├── analysisStatus: "pending" | "processing" | "completed" | "failed"
+  ├── contentHash: string                    # SHA-256 for dedup
+  └── analysisSourceId?: string              # Source image if duplicate
 
-/images/{imageId} ├── imageId, userId, storagePath, originalName, mimeType, size
-├── width, height, uploadedAt ├── analysisStatus: "pending" | "processing" |
-"completed" | "failed" ├── contentHash: string # SHA-256 for dedup └──
-analysisSourceId?: string # Source image if duplicate
+/analysis/{imageId}
+  ├── imageId, userId, analyzedAt, version
+  ├── items: Ingredient[]
+  │     └── { name, quantity, unit, confidence, freshness, category }
+  ├── summary: string
+  └── recommendations/
+        ├── recommendations: RecipeRecommendation[]
+        │     └── { title, description, prepTime, cookTime, difficulty, cuisineType }
+        └── summary: string
 
-/analysis/{imageId} ├── imageId, userId, analyzedAt, version ├── items:
-Ingredient[] │ └── { name, quantity, unit, confidence, freshness, category } ├──
-summary: string └── recommendations/ ├── recommendations: RecipeRecommendation[]
-│ └── { title, description, prepTime, cookTime, difficulty, cuisineType } └──
-summary: string
+/urlExtractions/{urlId}
+  ├── urlId, userId, sourceUrl, platform
+  ├── status: "queued" | "processing" | "completed" | "failed"
+  ├── submittedAt, completedAt?, error?
+  └── urlHash: string                        # SHA-256(normalized URL)
 
-/urlExtractions/{urlId} ├── urlId, userId, sourceUrl, platform ├── status:
-"queued" | "processing" | "completed" | "failed" ├── submittedAt, completedAt?,
-error? └── urlHash: string # SHA-256(normalized URL)
+/urlRecipes/{urlId}
+  ├── urlId, sourceUrl, platform
+  ├── recipe: ExtractedRecipe
+  │     ├── title, description, author?
+  │     ├── ingredients: RecipeIngredient[]
+  │     │     └── { name, quantity, unit, category, preparation, optional }
+  │     ├── steps: RecipeStep[]
+  │     │     └── { stepNumber, instruction, durationMinutes, tip? }
+  │     ├── timings: { prepMinutes, cookMinutes, totalMinutes, restMinutes }
+  │     ├── servings, difficulty, cuisine, mealType
+  │     ├── dietaryTags[], equipment[]
+  │     └── notes[]
+  ├── extractedAt: string
+  └── version: string
 
-/urlRecipes/{urlId} ├── urlId, sourceUrl, platform ├── recipe: ExtractedRecipe │
-├── title, description, author? │ ├── ingredients: RecipeIngredient[] │ │ └── {
-name, quantity, unit, category, preparation, optional } │ ├── steps:
-RecipeStep[] │ │ └── { stepNumber, instruction, durationMinutes, tip? } │ ├──
-timings: { prepMinutes, cookMinutes, totalMinutes, restMinutes } │ ├── servings,
-difficulty, cuisine, mealType │ ├── dietaryTags[], equipment[] │ └── notes[] ├──
-extractedAt: string └── version: string
+/sharedUrlRecipes/{urlHash} → urlId          # Deduplication index
 
-/sharedUrlRecipes/{urlHash} → urlId # Deduplication index
-
-/imageHashes/{userId}/{contentHash} → imageId # Deduplication index
-
+/imageHashes/{userId}/{contentHash} → imageId  # Deduplication index
 ```
 
 ---
@@ -322,10 +343,10 @@ extractedAt: string └── version: string
 ## Cloud Storage Structure
 
 ```
-
-gs://{bucket}/ └── users/{userId}/ └── images/ └── {imageId}.jpg # Optimized
-original
-
+gs://{bucket}/
+  └── users/{userId}/
+        └── images/
+              └── {imageId}.jpg    # Optimized original
 ```
 
 ---
@@ -335,10 +356,8 @@ original
 Redis is completely optional and non-blocking. If unavailable, the app falls back to direct database reads.
 
 ```
-
-Request → Check Redis Cache → Hit? Return cached → Miss? Fetch from RTDB → Cache
-→ Return
-
+Request → Check Redis Cache → Hit? Return cached
+                                → Miss? Fetch from RTDB → Cache → Return
 ```
 
 Key TTLs:
@@ -395,5 +414,3 @@ See individual documentation files for detailed setup:
 - [Redis Caching & Deduplication](./caching.md) - Detailed caching strategies
 - [Security Improvements](./security-improvements.md) - Security features and best practices
 - [Cost Estimation](./cost-estimation.md) - Detailed cost breakdowns for GCP services
-
-```
